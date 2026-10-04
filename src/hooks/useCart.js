@@ -387,7 +387,7 @@ function useCart({ toast_, getNow, receiptAdditionals: initialReceiptAdditionals
     } catch { /* KDS must never block saving an open bill. */ }
     clearCart();
     setDrawerOpen(false);
-  }, [items, receiptAdditionalValues, receiptAdditionals, activeBill, toast_, getNow, clearCart, stockErrors, applyBahanUsage, pax, tableNumber, manualDiscountValue, effectiveManualDiscountType, checkRequiredManualDiscount, bills, queueKdsTickets]);
+  }, [items, receiptAdditionalValues, receiptAdditionals, activeBill, toast_, getNow, clearCart, stockErrors, applyBahanUsage, pax, tableNumber, manualDiscountValue, effectiveManualDiscountType, checkRequiredManualDiscount, queueKdsTickets]);
 
   // deps: needs receiptAdditionals to read current receipt additionals config
   const loadBillToCart = useCallback((bill) => {
