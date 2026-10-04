@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { KDS_STATUS_LABEL } from "../../shared/kds-contract.js";
+import { KDS_STATUS_LABEL } from "../../monitoring-frontend/src/utils/kds-contract.js";
 import { buildKdsTickets } from "./kds.js";
 
 const categories = [{ key: "cat_coffee", label: "Minuman" }];

@@ -1,4 +1,4 @@
-import { KDS_KIND_LABEL } from "../../shared/kds-contract.js";
+import { KDS_KIND_LABEL } from "../../monitoring-frontend/src/utils/kds-contract.js";
 
 const clean = (value) => String(value ?? "").trim();
 
