@@ -66,6 +66,7 @@ function KasirWorkspace() {
   // to reload history AND push the menu whose stock was just restored.
   const historyRefreshRef = useRef(null);
   const menuSetRef = useRef(null);
+  const kdsEnabledRef = useRef(false);
   // bahanUsageRef — bahan baku dipotong di renderer (resep+bahan ada di sini),
   // tetapi useCart dibuat SEBELUM useAdvancedData. Ref memutus siklus urutan
   // deklarasi itu (pola sama seperti historyRefreshRef/menuSetRef).
@@ -75,6 +76,7 @@ function KasirWorkspace() {
     toast_: toastH.toast_,
     addUndo: toastH.addUndo,
     applyBahanUsage,
+    kdsEnabledRef,
     onVoided: (_id, menu) => {
       if (Array.isArray(menu) && menu.length) menuSetRef.current?.(menu);
       historyRefreshRef.current?.();
@@ -84,9 +86,9 @@ function KasirWorkspace() {
   const authH     = useAuth({ getNow, toast_: toastH.toast_ });
   const menuH     = useMenu({ toast_: toastH.toast_, addUndo: toastH.addUndo });
   menuSetRef.current = menuH.setMenu;
-  const billsH    = useBills({ toast_: toastH.toast_, addUndo: toastH.addUndo, applyBahanUsage });
+  const billsH    = useBills({ toast_: toastH.toast_, addUndo: toastH.addUndo, applyBahanUsage, kdsEnabledRef });
   const cartH     = useCart({
-    toast_: toastH.toast_, getNow, receiptAdditionals: [], menu: menuH.menu,
+    toast_: toastH.toast_, getNow, receiptAdditionals: [], menu: menuH.menu, categories: menuH.cats,
     applyBahanUsage,
   });
   const historyH  = useHistory({ toast_: toastH.toast_, addUndo: toastH.addUndo, getNow, authH, applyBahanUsage });
@@ -100,11 +102,14 @@ function KasirWorkspace() {
   const settingsH = useSettings({ 
     toast_: toastH.toast_, 
     onChange: (newSettings) => {
+      kdsEnabledRef.current = newSettings.kdsSettings?.enabled === true;
       cartH.setReceiptAdditionals(newSettings.receiptAdditionals || []);
       cartH.setPaxEnabled(newSettings.receiptPaxEnabled === true);
       cartH.setTableEnabled(newSettings.receiptTableEnabled === true);
+      cartH.setKdsSettings(newSettings.kdsSettings || { enabled: false, stations: [], unmappedStationId: "" });
       cartH.setPricingConfig({
         discounts: newSettings.discounts || [],
+        manualCartDiscount: newSettings.manualCartDiscount || { enabled: false, required: false, type: "percentage" },
         pajak: newSettings.pajak || { enabled: false, value: 0 },
         service: newSettings.service || { enabled: false, value: 0 },
       });
@@ -156,6 +161,7 @@ function KasirWorkspace() {
       : [];
     cartH.setPricingConfig({
       discounts: [...baseDiscounts, ...loyaltyRules],
+      manualCartDiscount: settingsH.settings.manualCartDiscount || { enabled: false, required: false, type: "percentage" },
       pajak: settingsH.settings.pajak || { enabled: false, value: 0 },
       service: settingsH.settings.service || { enabled: false, value: 0 },
     });
@@ -163,6 +169,7 @@ function KasirWorkspace() {
   }, [
     settingsH.settings.advancedFeatures?.loyalty,
     settingsH.settings.discounts,
+    settingsH.settings.manualCartDiscount,
     settingsH.settings.pajak,
     settingsH.settings.service,
     settingsH.settings.loyaltyTierBasis,
@@ -312,6 +319,8 @@ function KasirWorkspace() {
     appendHistory: (trx) => { historyH.appendHistory(trx); setReceipt(trx); setPayModal(false); cartH.setDrawerOpen(false); cartH.clearCart(); customersH.setSelectedCustomerId(null); },
     removeBillLocal: billsH.removeBillLocal,
     billIdToClose: cartH.activeBill?.id,     // Use activeBill directly instead of ref
+    kdsSent: cartH.activeBill?.kdsSent,
+    kdsPreviousItems: cartH.activeBill?.items || [],
     paymentMethods: settingsH.settings.paymentMethods || [], // NEW: payment methods for label resolution
     customer: customersH.selectedCustomer, // GAP 5: denormalized into trx for receipt
     paxEnabled: settingsH.settings.receiptPaxEnabled,
@@ -322,6 +331,7 @@ function KasirWorkspace() {
     cartH.setDrawerOpen, cartH.clearCart, billsH.removeBillLocal,
     settingsH.settings.paymentMethods, // NEW deps
     settingsH.settings.receiptPaxEnabled, settingsH.settings.receiptTableEnabled,
+    cartH.activeBill?.id, cartH.activeBill?.kdsSent, cartH.activeBill?.items,
     customersH.selectedCustomer, // GAP 5
     customersH.setSelectedCustomerId, // GAP 5
   ]);
@@ -448,6 +458,10 @@ const executeConfirmDel = useCallback((restoreStock = false) => {
             receiptAdditionalValues={cartH.receiptAdditionalValues} receiptAdditionals={cartH.receiptAdditionals} updateReceiptAdditionalValue={cartH.updateReceiptAdditionalValue}
             pax={cartH.pax} setPax={cartH.setPax} tableNumber={cartH.tableNumber} setTableNumber={cartH.setTableNumber}
             paxEnabled={settingsH.settings.receiptPaxEnabled === true} tableEnabled={settingsH.settings.receiptTableEnabled === true}
+            manualDiscountConfig={cartH.pricingConfig.manualCartDiscount}
+            manualDiscountValue={cartH.manualDiscountValue}
+            setManualDiscountValue={cartH.setManualDiscountValue}
+            checkRequiredManualDiscount={cartH.checkRequiredManualDiscount}
             customerPicker={<CustomerPicker customers={customersH.customers} selectedCustomer={customersH.selectedCustomer} setSelectedCustomerId={customersH.setSelectedCustomerId} upsertCustomer={customersH.upsertCustomer} />}
             customerEnabled={settingsH.settings.customerEnabled !== false}
             loyaltyTier={

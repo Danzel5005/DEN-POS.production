@@ -2,6 +2,7 @@ import { useState, useCallback } from "react";
 import { calcPrice } from "../utilities/calculations.js";
 import { api } from "../utilities/utils.js";
 import { resolveLine, stockQty, cartKeyFor, unitOptions, linePricing, stepQtyForUnit, computeStockErrors } from "../utilities/units.js";
+import { buildKdsTickets } from "../utilities/kds.js";
 
 // lineBaseQty — qty baris keranjang SELALU disimpan dalam SATUAN DASAR.
 // Jadi untuk baris yang sudah tersimpan, qty-nya langsung dipakai (JANGAN
@@ -51,7 +52,7 @@ function withUnitLabel(items) {
 // terlibat dalam race condition Tahap 2. Dependency array di bawah
 // diverifikasi dengan sangat hati-hati: salah satu deps hilang di sini
 // bisa MENCIPTAKAN stale closure baru, bukan cuma gagal mencegah yang lama.
-function useCart({ toast_, getNow, receiptAdditionals: initialReceiptAdditionals = [], menu = [], applyBahanUsage = null }) {
+function useCart({ toast_, getNow, receiptAdditionals: initialReceiptAdditionals = [], menu = [], categories = [], applyBahanUsage = null }) {
   const [cart, setCart]         = useState({});
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [receiptAdditionalValues, setReceiptAdditionalValues] = useState({}); // { "nomor_meja": "5", "jumlah_pax": "2" }
@@ -61,6 +62,8 @@ function useCart({ toast_, getNow, receiptAdditionals: initialReceiptAdditionals
   const [tableNumber, setTableNumber] = useState("");
   const [metode, setMetode]     = useState("cash");
   const [paid, setPaid]         = useState("");
+  const [manualDiscountValue, setManualDiscountValue] = useState("");
+  const [manualDiscountType, setManualDiscountType] = useState("");
   const [activeBill, setActiveBill] = useState(null);
   const [additionalsModal, setAdditionalsModal] = useState({ open: false, item: null });
   const [pendingItem, setPendingItem] = useState(null);
@@ -71,6 +74,24 @@ function useCart({ toast_, getNow, receiptAdditionals: initialReceiptAdditionals
     pajak: { enabled: false, value: 0 },
     service: { enabled: false, value: 0 },
   });
+  const [kdsSettings, setKdsSettings] = useState({ enabled: false, stations: [], unmappedStationId: "" });
+
+  const queueKdsTickets = useCallback(async ({ items: ticketItems, prevItems, meta }) => {
+    if (!kdsSettings.enabled) return { ok: false, queued: 0 };
+    try {
+      const deviceStatus = await api.deviceStatus();
+      const tickets = buildKdsTickets({
+        items: ticketItems,
+        prevItems,
+        categories,
+        stations: kdsSettings.stations || [],
+        meta: { ...meta, deviceId: deviceStatus?.identity?.deviceId || "pos", unmappedStationId: kdsSettings.unmappedStationId },
+      });
+      return tickets.length ? { ...(await api.kdsSend(tickets)), ticketCount: tickets.length } : { ok: true, queued: 0, ticketCount: 0 };
+    } catch {
+      return { ok: false, queued: 0 };
+    }
+  }, [categories, kdsSettings]);
 
   // items — baris keranjang dengan harga/modal EFEKTIF per satuan dasar.
   // Harga dihitung ulang setiap render dari qty & satuan aktif lewat
@@ -84,7 +105,12 @@ function useCart({ toast_, getNow, receiptAdditionals: initialReceiptAdditionals
     return { ...line, harga: p.harga, modal: p.modal, tierHarga: p.tierHarga };
   });
   const subtotal = items.reduce((s, i) => s + i.harga * i.qty, 0);
-  const { pajak, service, discount, total } = calcPrice(subtotal, { ...pricingConfig, items });
+  const manualDiscountConfig = pricingConfig.manualCartDiscount || {};
+  const effectiveManualDiscountType = manualDiscountType || manualDiscountConfig.type || "percentage";
+  const manualDiscount = (manualDiscountConfig.enabled || (activeBill && String(manualDiscountValue).trim() !== ""))
+    ? { type: effectiveManualDiscountType, value: manualDiscountValue }
+    : undefined;
+  const { pajak, service, discount, total } = calcPrice(subtotal, { ...pricingConfig, items, manualDiscount });
   const paidNum   = parseInt(paid.replace(/\D/g, "")) || 0;
   const kembalian = paidNum - total;
 
@@ -112,8 +138,9 @@ function useCart({ toast_, getNow, receiptAdditionals: initialReceiptAdditionals
   });
 
   // Use checkRequiredAdditionals to validate all required receipt additionals (not just tableNum)
-  const canPay    = items.length > 0 && stockErrors.length === 0 && checkRequiredAdditionals(receiptAdditionals) && (!paxEnabled || Number(pax) > 0) && (metode !== "cash" || paidNum > 0 || total === 0);
-  const getCanPay = useCallback((additionals) => items.length > 0 && stockErrors.length === 0 && checkRequiredAdditionals(additionals) && (!paxEnabled || Number(pax) > 0) && (metode !== "cash" || paidNum > 0 || total === 0), [items, stockErrors, checkRequiredAdditionals, metode, paidNum, total, paxEnabled, pax]);
+  const checkRequiredManualDiscount = useCallback(() => !manualDiscountConfig.enabled || !manualDiscountConfig.required || String(manualDiscountValue).trim() !== "", [manualDiscountConfig.enabled, manualDiscountConfig.required, manualDiscountValue]);
+  const canPay = items.length > 0 && stockErrors.length === 0 && checkRequiredAdditionals(receiptAdditionals) && checkRequiredManualDiscount() && (!paxEnabled || Number(pax) > 0) && (metode !== "cash" || paidNum > 0 || total === 0);
+  const getCanPay = useCallback((additionals) => items.length > 0 && stockErrors.length === 0 && checkRequiredAdditionals(additionals) && checkRequiredManualDiscount() && (!paxEnabled || Number(pax) > 0) && (metode !== "cash" || paidNum > 0 || total === 0), [items, stockErrors, checkRequiredAdditionals, checkRequiredManualDiscount, metode, paidNum, total, paxEnabled, pax]);
 
   // PENTING: pakai functional update setCart(c=>...), TIDAK baca `cart`
   // langsung dari closure — pattern paling stabil. Tapi memanggil toast_,
@@ -214,7 +241,7 @@ function useCart({ toast_, getNow, receiptAdditionals: initialReceiptAdditionals
 
   // deps kosong aman: semua setter dengan nilai konstan, tidak baca state.
   const clearCart = useCallback(() => {
-    setCart({}); setPaid(""); setMetode("cash"); setActiveBill(null); setReceiptAdditionalValues({}); setPax(""); setTableNumber(""); setAdditionalsModal({ open: false, item: null }); setDrawerOpen(false);
+    setCart({}); setPaid(""); setManualDiscountValue(""); setManualDiscountType(""); setMetode("cash"); setActiveBill(null); setReceiptAdditionalValues({}); setPax(""); setTableNumber(""); setAdditionalsModal({ open: false, item: null }); setDrawerOpen(false);
   }, []);
 
   // Update a single receipt additional field value
@@ -239,7 +266,7 @@ function useCart({ toast_, getNow, receiptAdditionals: initialReceiptAdditionals
     applyStockView,  // NEW (Langkah 2): stok dihitung di main process
     customer = null, paxEnabled = false, tableEnabled = false,
   }) => {
-    if (!items.length || !checkRequiredAdditionals(receiptAdditionals) || (paxEnabled && Number(pax) <= 0)) { toast_("Isi field wajib dan pesanan dulu", "err"); return; }
+    if (!items.length || !checkRequiredAdditionals(receiptAdditionals) || !checkRequiredManualDiscount() || (paxEnabled && Number(pax) <= 0)) { toast_("Isi field wajib dan pesanan dulu", "err"); return; }
     if (stockErrors.length > 0) {
       const e = stockErrors[0];
       toast_(`Stok "${e.nama}" tidak mencukupi: butuh ${e.needed}, tersedia ${e.available}`, "err");
@@ -309,7 +336,7 @@ function useCart({ toast_, getNow, receiptAdditionals: initialReceiptAdditionals
       
       updatedBills = bills.map(b =>
         String(b.id) === String(activeBill.id)
-          ? { ...b, items: withUnitLabel(items), updatedAt: t.timestamp, ...customerData, ...partyData, ...receiptAdditionalData }
+          ? { ...b, items: withUnitLabel(items), updatedAt: t.timestamp, manualDiscountValue, manualDiscountType: effectiveManualDiscountType, ...customerData, ...partyData, ...receiptAdditionalData }
           : b
       );
       toast_('Open Bill diperbarui', "ok");
@@ -323,7 +350,7 @@ function useCart({ toast_, getNow, receiptAdditionals: initialReceiptAdditionals
       // Bahan baku: potong sesuai resep untuk seluruh item bill baru.
       if (applyBahanUsage) applyBahanUsage(items, -1);
       
-      const bill = { id: billId, items: withUnitLabel(items), createdAt: t.timestamp, updatedAt: t.timestamp, status: "open", ...customerData, ...partyData, ...receiptAdditionalData };
+      const bill = { id: billId, items: withUnitLabel(items), createdAt: t.timestamp, updatedAt: t.timestamp, status: "open", manualDiscountValue, manualDiscountType: effectiveManualDiscountType, ...customerData, ...partyData, ...receiptAdditionalData };
       updatedBills = [...bills, bill];
       setBillId(n => n + 1);
       toast_('Open Bill dibuat', "ok");
@@ -338,9 +365,29 @@ function useCart({ toast_, getNow, receiptAdditionals: initialReceiptAdditionals
     }
     
     await persistBills(updatedBills);
+    try {
+      const priorBill = activeBill && (bills.find((bill) => String(bill.id) === String(activeBill.id)) || activeBill);
+      const billRef = activeBill?.id || billId;
+      const kdsResult = await queueKdsTickets({
+        items,
+        prevItems: priorBill?.kdsSent ? priorBill.items || [] : undefined,
+        meta: {
+          sourceRef: String(billRef),
+          sourceLabel: `Bill #${billRef}`,
+          clientTicketId: `${billRef}:${t.timestamp}`,
+          createdAt: t.timestamp,
+          tableLabel: partyData.tableNumber ? `Meja ${partyData.tableNumber}` : "",
+          extras: receiptAdditionals.filter((field) => field.category === "receipt" && receiptAdditionalData[field.key]).map((field) => ({ label: field.label, value: receiptAdditionalData[field.key] })),
+        },
+      });
+      if (kdsResult.ok && kdsResult.ticketCount > 0) {
+        updatedBills = updatedBills.map((bill) => String(bill.id) === String(billRef) ? { ...bill, kdsSent: true } : bill);
+        await persistBills(updatedBills);
+      }
+    } catch { /* KDS must never block saving an open bill. */ }
     clearCart();
     setDrawerOpen(false);
-  }, [items, receiptAdditionalValues, receiptAdditionals, activeBill, toast_, getNow, clearCart, stockErrors, applyBahanUsage, pax, tableNumber]);
+  }, [items, receiptAdditionalValues, receiptAdditionals, activeBill, toast_, getNow, clearCart, stockErrors, applyBahanUsage, pax, tableNumber, manualDiscountValue, effectiveManualDiscountType, checkRequiredManualDiscount, bills, queueKdsTickets]);
 
   // deps: needs receiptAdditionals to read current receipt additionals config
   const loadBillToCart = useCallback((bill) => {
@@ -351,6 +398,8 @@ function useCart({ toast_, getNow, receiptAdditionals: initialReceiptAdditionals
     setCart(c);
     setPax(bill.pax == null ? "" : String(bill.pax));
     setTableNumber(bill.tableNumber || "");
+    setManualDiscountValue(bill.manualDiscountValue == null ? "" : String(bill.manualDiscountValue));
+    setManualDiscountType(bill.manualDiscountType || "");
     // Load receipt additional values from bill
     if (receiptAdditionals) {
       receiptAdditionals
@@ -385,14 +434,17 @@ const processPayment = useCallback(async ({
   customer = null, // Selected customer/member snapshot (denormalized into trx)
   paxEnabled = false,
   tableEnabled = false,
+  kdsSent = false,
+  kdsPreviousItems = [],
 }) => {
     if (stockErrors.length > 0) {
       const e = stockErrors[0];
       toast_(`Stok "${e.nama}" tidak mencukupi: butuh ${e.needed}, tersedia ${e.available}`, "err");
       return null;
     }
+  if (!checkRequiredManualDiscount()) { toast_("Isi diskon manual terlebih dahulu", "err"); return null; }
   const t = getNow();
-  const { pajak: p, service: s, discount: d, total: tot } = calcPrice(subtotal, { ...pricingConfig, items });
+  const { pajak: p, service: s, discount: d, total: tot } = calcPrice(subtotal, { ...pricingConfig, items, manualDiscount });
   
   // Build receipt additional values for the transaction
   const receiptAdditionalData = {};
@@ -424,6 +476,10 @@ const processPayment = useCallback(async ({
   const trx = {
     id: trxId, ...t, items: withUnitLabel(items),
     subtotal, pajak: p, service: s, discount: d, total: tot,
+    kdsSourceRef: String(billIdToClose || trxId),
+    kdsTicketSent: kdsSettings.enabled || kdsSent,
+    manualDiscountValue,
+    manualDiscountType: effectiveManualDiscountType,
     metodeBayar: metode,
     metodeBayarLabel: metodeLabel, // NEW: store label in transaction
     bayar: metode === "cash" ? paidNum : tot,
@@ -448,6 +504,22 @@ const processPayment = useCallback(async ({
 
   if (!result.ok) { toast_("Gagal menyimpan transaksi", "err"); return null; }
 
+  if (kdsSettings.enabled) {
+    await queueKdsTickets({
+      items,
+      prevItems: billIdToClose && kdsSent ? kdsPreviousItems : undefined,
+      meta: {
+        sourceRef: String(billIdToClose || trx.id),
+        sourceLabel: billIdToClose ? `Bill #${billIdToClose}` : `Transaksi #${trx.id}`,
+        clientTicketId: `${billIdToClose || trx.id}:${t.timestamp}`,
+        createdAt: t.timestamp,
+        tableLabel: trx.tableNumber ? `Meja ${trx.tableNumber}` : "",
+        extras: receiptAdditionals.filter((field) => field.category === "receipt" && receiptAdditionalData[field.key]).map((field) => ({ label: field.label, value: receiptAdditionalData[field.key] })),
+        createdByLabel: trx.operator,
+      },
+    });
+  }
+
   if (result.stock && applyStockView) applyStockView(result.stock); // patch view setelah IPC sukses
   // Bahan baku: potong sesuai resep hanya untuk penjualan langsung (bukan
   // pelunasan open bill — stok bahan sudah dipotong saat bill dibuat).
@@ -458,16 +530,16 @@ const processPayment = useCallback(async ({
   clearCart();
   if (onSuccess) onSuccess(trx);
   return trx;
-}, [items, subtotal, pricingConfig, metode, paidNum, kembalian, cart, toast_, getNow, clearCart, stockErrors, applyBahanUsage, pax, tableNumber]);
+}, [items, subtotal, pricingConfig, manualDiscount, manualDiscountValue, effectiveManualDiscountType, checkRequiredManualDiscount, metode, paidNum, kembalian, cart, toast_, getNow, clearCart, stockErrors, applyBahanUsage, pax, tableNumber, receiptAdditionals, kdsSettings.enabled, queueKdsTickets]);
 
   return {
-    cart, drawerOpen, receiptAdditionalValues, receiptAdditionals, metode, paid, activeBill, pax, setPax, setPaxEnabled, setTableEnabled, tableNumber, setTableNumber,
-    items, subtotal, pajak, service, discount, total, pricingConfig, paidNum, kembalian, canPay,
+    cart, drawerOpen, receiptAdditionalValues, receiptAdditionals, metode, paid, activeBill, pax, setPax, setPaxEnabled, setTableEnabled, tableNumber, setTableNumber, manualDiscountValue, setManualDiscountValue, kdsSettings, setKdsSettings,
+    items, subtotal, pajak, service, discount, total, pricingConfig, manualDiscount, paidNum, kembalian, canPay,
     stockErrors,
     setDrawerOpen, updateReceiptAdditionalValue, setMetode, setPaid,
     addToCart, decCart, delCart, clearCart,
     setUnit, resolveLine,
-    saveOpenBill, loadBillToCart, processPayment, checkRequiredAdditionals, getCanPay,
+    saveOpenBill, loadBillToCart, processPayment, checkRequiredAdditionals, checkRequiredManualDiscount, getCanPay,
     setReceiptAdditionals,
     setPricingConfig,
   };

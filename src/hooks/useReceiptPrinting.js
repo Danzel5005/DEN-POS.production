@@ -43,6 +43,7 @@ function useReceiptPrinting({ settingsH, menuH, cartH, toast_ }) {
         operatorName: trx.operator,
         cats: menuH.cats,
         customerEnabled: settingsH.settings.customerEnabled !== false,
+        receiptAdditionals: settingsH.settings.receiptAdditionals,
       });
       if (res?.ok) toast_("Selesai Mencetak Resi", "ok");
       else toast_(res?.error || "Gagal cetak thermal", "err");
@@ -67,12 +68,12 @@ function useReceiptPrinting({ settingsH, menuH, cartH, toast_ }) {
     if (!cartH.items.length) { toast_("Isi pesanan dulu", "err"); return; }
     setPrintingPreview(true);
     try {
-      const html = buildPreviewHTML(cartH.receiptAdditionalValues, cartH.items, settingsH.logo, settingsH.settings.receiptAdditionals, settingsH.settings.warungName, menuH.cats, settingsH.settings.warungAddress, settingsH.settings.warungPhone, settingsH.settings.receiptPaperWidthMm, cartH.pricingConfig, cartH.paidNum, cartH.metode, settingsH.settings.receiptHeaderText, settingsH.settings.receiptFooterText);
+      const html = buildPreviewHTML(cartH.receiptAdditionalValues, cartH.items, settingsH.logo, settingsH.settings.receiptAdditionals, settingsH.settings.warungName, menuH.cats, settingsH.settings.warungAddress, settingsH.settings.warungPhone, settingsH.settings.receiptPaperWidthMm, { ...cartH.pricingConfig, manualDiscount: cartH.manualDiscount }, cartH.paidNum, cartH.metode, settingsH.settings.receiptHeaderText, settingsH.settings.receiptFooterText);
       await settingsH.printHTML(html, "Mencetak preview tagihan...");
     } finally {
       setPrintingPreview(false);
     }
-  }, [cartH.items, cartH.receiptAdditionalValues, cartH.pricingConfig, cartH.paidNum, cartH.metode, toast_, settingsH.logo, settingsH.printHTML, settingsH.settings.receiptAdditionals, settingsH.settings.warungName, settingsH.settings.warungAddress, settingsH.settings.warungPhone, menuH.cats, settingsH.settings.receiptPaperWidthMm, settingsH.settings.receiptHeaderText, settingsH.settings.receiptFooterText]);
+  }, [cartH.items, cartH.receiptAdditionalValues, cartH.pricingConfig, cartH.manualDiscount, cartH.paidNum, cartH.metode, toast_, settingsH.logo, settingsH.printHTML, settingsH.settings.receiptAdditionals, settingsH.settings.warungName, settingsH.settings.warungAddress, settingsH.settings.warungPhone, menuH.cats, settingsH.settings.receiptPaperWidthMm, settingsH.settings.receiptHeaderText, settingsH.settings.receiptFooterText]);
 
   return { printReceipt, printPreview, printingPreview };
 }

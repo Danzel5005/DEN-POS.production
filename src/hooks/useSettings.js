@@ -48,6 +48,7 @@ function useSettings({ toast_, onChange }) {
     receiptFooterText: "",
     receiptPaperWidthMm: 80,
     discounts: [],
+    manualCartDiscount: { enabled: false, required: false, type: "percentage" },
     pajak: { enabled: false, value: 0 },
     service: { enabled: false, value: 0 },
     customerEnabled: true,
@@ -89,6 +90,20 @@ function useSettings({ toast_, onChange }) {
       s.expenseCategories = DEFAULT_EXPENSE_CATEGORIES;
     }
     if (!Array.isArray(s.discounts)) s.discounts = [];
+    const kdsSettings = s.kdsSettings && typeof s.kdsSettings === "object" ? s.kdsSettings : {};
+    s.kdsSettings = {
+      enabled: kdsSettings.enabled === true,
+      stations: Array.isArray(kdsSettings.stations) ? kdsSettings.stations
+        .filter((station) => station && typeof station === "object" && station.label)
+        .map((station) => ({ id: String(station.id || ""), label: String(station.label).trim(), categoryKeys: Array.isArray(station.categoryKeys) ? station.categoryKeys.map(String) : [] })) : [],
+      unmappedStationId: String(kdsSettings.unmappedStationId || ""),
+    };
+    if (!s.manualCartDiscount || typeof s.manualCartDiscount !== "object") s.manualCartDiscount = { enabled: false, required: false, type: "percentage" };
+    s.manualCartDiscount = {
+      enabled: s.manualCartDiscount.enabled === true,
+      required: s.manualCartDiscount.required === true,
+      type: s.manualCartDiscount.type === "fixed" ? "fixed" : "percentage",
+    };
     if (!s.pajak || typeof s.pajak !== "object") s.pajak = { enabled: false, value: 0 };
     if (!s.service || typeof s.service !== "object") s.service = { enabled: false, value: 0 };
     // Ensure new fields exist

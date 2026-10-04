@@ -39,7 +39,7 @@ export default function BillDetailModal({
   const sub = bill.items?.reduce((s, i) => s + (i.harga || 0) * (i.qty || 0), 0) || 0;
   // Must mirror ViewOpenBill: pass bill.items + pricingConfig, otherwise the
   // modal would show different discount/tax/service/total than the bill card.
-  const { pajak: p, service: s, discount: disc, total: tot } = calcPrice(sub, { ...pricingConfig, items: bill.items || [] });
+  const { pajak: p, service: s, discount: disc, total: tot } = calcPrice(sub, { ...pricingConfig, items: bill.items || [], manualDiscount: { type: bill.manualDiscountType || pricingConfig.manualCartDiscount?.type, value: bill.manualDiscountValue } });
   const itemCount = bill.items?.reduce((sum, i) => sum + (i.qty || 0), 0) || 0;
   const created = new Date(bill.createdAt);
   const timeStr = created.toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" });

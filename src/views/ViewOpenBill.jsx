@@ -120,7 +120,7 @@ function ViewOpenBill({
           <div style={{ display: "grid", gap: SPACING.md }}>
             {openBills.map((bill, index) => {
               const sub = bill.items?.reduce((s, i) => s + (i.harga || 0) * (i.qty || 0), 0) || 0;
-              const { pajak: p, service: s, total: tot } = calcPrice(sub, { ...pricingConfig, items: bill.items || [] });
+              const { pajak: p, service: s, total: tot } = calcPrice(sub, { ...pricingConfig, items: bill.items || [], manualDiscount: { type: bill.manualDiscountType || pricingConfig.manualCartDiscount?.type, value: bill.manualDiscountValue } });
               const itemCount = bill.items?.reduce((sum, i) => sum + (i.qty || 0), 0) || 0;
 
               return (

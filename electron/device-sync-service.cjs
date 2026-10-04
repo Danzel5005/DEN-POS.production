@@ -1,5 +1,6 @@
 const fs = require("fs");
 const path = require("path");
+const crypto = require("crypto");
 
 // ── Device sync service (IPC bridge) ────────────────────────────────────────
 //
@@ -101,6 +102,7 @@ function createDeviceSyncService({
       baseUrl: getBaseUrl(),
       configured: Boolean(getBaseUrl()),
       pendingCount: getPendingCount(),
+      kdsPendingCount: getKdsStatus().pendingCount,
       autoSync: isAutoSyncRunning(),
     };
   }
@@ -142,6 +144,7 @@ function createDeviceSyncService({
       }
     }
     syncAutoSyncState();
+    if (res.paired) void flushKdsOutbox().catch(() => {});
     return { ...res, identity: identity.getPublicIdentity() };
   }
 
@@ -150,6 +153,104 @@ function createDeviceSyncService({
     if (!getBaseUrl()) return { ok: false, error: "URL backend belum diatur" };
     if (!identity.isRegistered()) return { ok: false, error: "Perangkat belum dipasangkan" };
     return c.push(batch);
+  }
+
+  function getKdsStatus() {
+    const config = readConfig();
+    const outbox = Array.isArray(config.kdsOutbox) ? config.kdsOutbox : [];
+    const lastError = config.kdsLastError || null;
+    return { pendingCount: outbox.length, error: lastError?.message || null, offline: Boolean(lastError?.offline) };
+  }
+
+  let kdsFlushInFlight = null;
+  let kdsRetryTimer = null;
+  let kdsRetryAttempt = 0;
+  function scheduleKdsRetry() {
+    if (kdsRetryTimer || !identity.isRegistered() || !getBaseUrl()) return;
+    const delay = Math.min(15000 * (2 ** kdsRetryAttempt), 5 * 60 * 1000);
+    kdsRetryAttempt += 1;
+    kdsRetryTimer = setTimeout(() => {
+      kdsRetryTimer = null;
+      void flushKdsOutbox().catch(() => {});
+    }, delay);
+    kdsRetryTimer.unref?.();
+  }
+  function stopKdsRetry() {
+    if (kdsRetryTimer) clearTimeout(kdsRetryTimer);
+    kdsRetryTimer = null;
+    kdsRetryAttempt = 0;
+  }
+
+  async function flushKdsOutbox() {
+    if (kdsFlushInFlight) return kdsFlushInFlight;
+    const work = (async () => {
+      if (!identity.isRegistered() || !getBaseUrl()) return { ok: false, ...getKdsStatus(), error: "Perangkat KDS belum dipasangkan" };
+      while (true) {
+        const entry = (readConfig().kdsOutbox || [])[0];
+        if (!entry) {
+          stopKdsRetry();
+          writeConfig({ kdsOutbox: [], kdsLastError: null });
+          return { ok: true, pendingCount: 0 };
+        }
+        let result;
+        try {
+          result = entry.type === "cancel"
+            ? await ensureClient().cancelKdsTickets(entry.sourceRef)
+            : await ensureClient().sendKdsTicket(entry.ticket);
+        } catch (err) {
+          result = { ok: false, error: err?.message || "Gagal mengirim tiket KDS", offline: true };
+        }
+        if (!result?.ok) {
+          const message = result?.error || "Gagal mengirim tiket KDS";
+          writeConfig({ kdsLastError: { message, offline: Boolean(result?.offline), at: new Date().toISOString() } });
+          const status = getKdsStatus();
+          notify({ kind: "kds-sync", ...status });
+          scheduleKdsRetry();
+          return { ok: false, ...status, error: message };
+        }
+        const remaining = (readConfig().kdsOutbox || []).filter((queued) => queued.id !== entry.id);
+        writeConfig({ kdsOutbox: remaining, kdsLastError: null });
+      }
+    })();
+    kdsFlushInFlight = work;
+    try { return await work; }
+    finally { kdsFlushInFlight = null; }
+  }
+
+  async function kdsSend(tickets) {
+    const rows = Array.isArray(tickets) ? tickets.slice(0, 100) : [];
+    if (!rows.length || rows.some((ticket) => !ticket?.client_ticket_id || JSON.stringify(ticket).length > 100000)) {
+      return { ok: false, ...getKdsStatus(), error: "Ticket KDS tidak valid" };
+    }
+    const config = readConfig();
+    const outbox = Array.isArray(config.kdsOutbox) ? config.kdsOutbox : [];
+    const known = new Set(outbox.filter((entry) => entry.type === "ticket").map((entry) => entry.ticket?.client_ticket_id));
+    const additions = rows.filter((ticket) => !known.has(ticket.client_ticket_id)).map((ticket) => ({
+      id: `ticket:${ticket.client_ticket_id}`,
+      type: "ticket",
+      ticket,
+      createdAt: new Date().toISOString(),
+    }));
+    if (outbox.length + additions.length > 2000) return { ok: false, ...getKdsStatus(), error: "Antrean KDS penuh; sambungkan internet sebelum menambah tiket." };
+    writeConfig({ kdsOutbox: [...outbox, ...additions] });
+    if (identity.isRegistered() && getBaseUrl()) void flushKdsOutbox().catch(() => {});
+    const status = getKdsStatus();
+    notify({ kind: "kds-sync", ...status });
+    return { ok: true, queued: additions.length, ...status };
+  }
+
+  async function kdsCancel(sourceRef) {
+    const ref = String(sourceRef || "").trim();
+    if (!ref || ref.length > 240) return { ok: false, ...getKdsStatus(), error: "Referensi pesanan tidak valid" };
+    const config = readConfig();
+    const outbox = Array.isArray(config.kdsOutbox) ? config.kdsOutbox : [];
+    const entry = { id: `cancel:${crypto.randomUUID()}`, type: "cancel", sourceRef: ref, createdAt: new Date().toISOString() };
+    if (outbox.length >= 2000) return { ok: false, ...getKdsStatus(), error: "Antrean KDS penuh; sambungkan internet sebelum membatalkan pesanan." };
+    writeConfig({ kdsOutbox: [...outbox, entry] });
+    if (identity.isRegistered() && getBaseUrl()) void flushKdsOutbox().catch(() => {});
+    const status = getKdsStatus();
+    notify({ kind: "kds-sync", ...status });
+    return { ok: true, queued: 1, ...status };
   }
 
   function rotateCredential() {
@@ -272,6 +373,7 @@ function createDeviceSyncService({
     autoTimer = setInterval(async () => {
       // Re-cek kondisi tiap tick: pairing bisa dicabut kapan saja.
       if (!identity.isRegistered() || !getBaseUrl()) { stopAutoSync(); return; }
+      await flushKdsOutbox();
       if (getPendingCount() <= 0) return; // tidak ada yang perlu dikirim
 
       const res = await pushTransactions();
@@ -294,6 +396,7 @@ function createDeviceSyncService({
 
   function stopAutoSync() {
     if (autoTimer) { clearInterval(autoTimer); autoTimer = null; }
+    stopKdsRetry();
   }
 
   function maybeStartStockSync() {
@@ -353,11 +456,15 @@ function createDeviceSyncService({
     ipcMain.handle("device-claim-ingredient-restock", (_e, event) => claimIngredientRestockProvider(event));
     ipcMain.handle("device-complete-ingredient-restock", (_e, eventId) => completeIngredientRestockProvider(eventId));
     ipcMain.handle("device-pending-count", () => getPendingCount());
+    ipcMain.handle("kds-send", (_e, tickets) => kdsSend(tickets));
+    ipcMain.handle("kds-cancel", (_e, sourceRef) => kdsCancel(sourceRef));
+    ipcMain.handle("kds-status", () => getKdsStatus());
+    ipcMain.handle("kds-retry", () => flushKdsOutbox());
     ipcMain.handle("device-credential", () => getCredentialForPairing());
     ipcMain.handle("device-rotate-credential", () => rotateCredential());
     ipcMain.handle("device-set-name", (_e, name) => setDeviceName(name));
     syncAutoSyncState();
-    return { getStatus, getIdentity, register, checkPairing, push, pushTransactions, exchangeStock, startAutoSync: maybeStartAutoSync, stopAutoSync, stopStockSync };
+    return { getStatus, getIdentity, register, checkPairing, push, pushTransactions, exchangeStock, kdsSend, kdsCancel, getKdsStatus, flushKdsOutbox, startAutoSync: maybeStartAutoSync, stopAutoSync, stopStockSync };
   }
 
   return {
@@ -377,6 +484,10 @@ function createDeviceSyncService({
     claimIngredientRestock: claimIngredientRestockProvider,
     completeIngredientRestock: completeIngredientRestockProvider,
     getPendingCount,
+    kdsSend,
+    kdsCancel,
+    getKdsStatus,
+    flushKdsOutbox,
     rotateCredential,
     setDeviceName,
     maybeStartAutoSync,

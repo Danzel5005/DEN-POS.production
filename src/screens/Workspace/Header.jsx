@@ -1,6 +1,26 @@
+import { useEffect, useState } from "react";
 import { G, OR, W, LT, BD, MT } from "../../constants/design.js";
 import { canAccessView, isAdmin } from "../../utilities/permissions.js";
+import { api } from "../../utilities/utils.js";
 import { ClockBadge } from "../../components/ClockBadge.jsx";
+
+function KdsPendingBadge() {
+  const [status, setStatus] = useState({ pendingCount: 0, error: null });
+  useEffect(() => {
+    let alive = true;
+    const refresh = () => api.kdsStatus().then((value) => { if (alive) setStatus(value || { pendingCount: 0 }); }).catch(() => {});
+    refresh();
+    const timer = setInterval(refresh, 10000);
+    const unsubscribe = api.onDeviceSyncEvent((event) => { if (event?.kind === "kds-sync") refresh(); });
+    const retryWhenOnline = () => { void api.kdsRetry().then(refresh); };
+    window.addEventListener("online", retryWhenOnline);
+    return () => { alive = false; clearInterval(timer); unsubscribe?.(); window.removeEventListener("online", retryWhenOnline); };
+  }, []);
+  if (!status.pendingCount && !status.error) return null;
+  return <span role="status" title={status.error || "Tiket menunggu koneksi"} style={{ padding: "4px 8px", background: status.error ? "#fef0f0" : "#fff7ed", color: status.error ? "#b91c1c" : "#92400e", border: `1px solid ${status.error ? "#fecaca" : "#fed7aa"}`, borderRadius: 5, fontSize: 10, fontWeight: 700, whiteSpace: "nowrap" }}>
+    {status.pendingCount} tiket KDS menunggu
+  </span>;
+}
 
 export default function Header({ settingsH, authH, billsH, historyH, view, navigate, logoRef }) {
   // Tombol "Fitur Lanjutan" hanya muncul saat saklar induk dinyalakan, supaya
@@ -39,6 +59,7 @@ export default function Header({ settingsH, authH, billsH, historyH, view, navig
       </div>
 
       <div style={{marginLeft:"auto",display:"flex",gap:6,alignItems:"center"}}>
+        {settingsH.settings.kdsSettings?.enabled && <KdsPendingBadge />}
         {isAdmin(authH.currentUser) && <button onClick={() => settingsH.setSettingsModal(true)} title="Pengaturan" style={{padding:"4px 10px",background:LT,color:G,border:`1px solid ${BD}`,borderRadius:6,cursor:"pointer",fontFamily:"inherit",fontSize:10,fontWeight:600}}>
           ⚙️ Pengaturan
         </button>}

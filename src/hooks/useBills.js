@@ -7,7 +7,7 @@ import { api } from "../utilities/utils.js";
 // saveOpenBill & loadBillToCart juga TIDAK di sini — mereka menulis ke
 // state cart secara langsung, jadi tinggal di useCart untuk menghindari
 // dua hook saling menulis ke state satu sama lain.
-function useBills({ toast_, addUndo, applyBahanUsage = null }) {
+function useBills({ toast_, addUndo, applyBahanUsage = null, kdsEnabledRef = null }) {
   const [bills, setBills] = useState([]);
   const [billId, setBillId] = useState(1);
 
@@ -24,16 +24,19 @@ function useBills({ toast_, addUndo, applyBahanUsage = null }) {
   const closeBill = useCallback(async (id) => {
     if (!id) return;
     setBills(prev => {
+      const billToClose = prev.find(b => String(b.id) === String(id));
       const snap = [...prev];
       const updated = prev.filter(b => String(b.id) !== String(id));
       api.saveBills(updated);
+      if (billToClose && (kdsEnabledRef?.current || billToClose.kdsSent)) void api.kdsCancel(String(id));
+      if (kdsEnabledRef?.current || billToCancel.kdsSent) void api.kdsCancel(String(id));
       addUndo("Hapus Open Bill", async () => {
         await api.saveBills(snap);
         setBills(snap);
       });
       return updated;
     });
-  }, [addUndo]);
+  }, [addUndo, kdsEnabledRef]);
 
   // Close single bill WITHOUT payment (cancel) - restore stock
   // This is called when user deletes an open bill without paying.
@@ -48,6 +51,7 @@ function useBills({ toast_, addUndo, applyBahanUsage = null }) {
       const snap = [...prev];
       const updated = prev.filter(b => String(b.id) !== String(id));
       api.saveBills(updated);
+      if (kdsEnabledRef?.current) void api.kdsCancel(String(id));
 
       // Delta positif: kembalikan stok item bill yang dibatalkan.
       const deltas = (billToCancel.items || []).reduce((acc, item) => {
@@ -80,20 +84,21 @@ function useBills({ toast_, addUndo, applyBahanUsage = null }) {
       });
       return updated;
     });
-  }, [addUndo, applyBahanUsage]);
+  }, [addUndo, applyBahanUsage, kdsEnabledRef]);
 
   // Clear all bills
   const clearAllBills = useCallback(async () => {
     setBills(prev => {
       const snap = [...prev];
       api.clearBills();
+      snap.filter((bill) => kdsEnabledRef?.current || bill.kdsSent).forEach((bill) => { void api.kdsCancel(String(bill.id)); });
       addUndo("Hapus Semua Open Bill", async () => {
         await api.restoreBills(snap);
         setBills(snap);
       });
       return [];
     });
-  }, [addUndo]);
+  }, [addUndo, kdsEnabledRef]);
 
   // Persist bills (called from useCart.saveOpenBill and after payment)
   // Uses functional update to avoid stale closure

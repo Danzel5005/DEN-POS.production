@@ -91,7 +91,7 @@ function createPrintingService({ app, ipcMain, BrowserWindow, dialog, dataDir, e
     return "";
   };
   const kvLine = (printer, label, value) => printer.leftRight(label, value);
-  const buildEscPosReceipt = (printer, trx, warungName, warungAddress, warungPhone, operatorName, cats = [], customerEnabled = true) => {
+  const buildEscPosReceipt = (printer, trx, warungName, warungAddress, warungPhone, operatorName, cats = [], customerEnabled = true, receiptAdditionals = []) => {
     const storeName = warungName || trx.warungName || "Warung";
     printer.alignCenter(); printer.bold(true); printer.setTextDoubleHeight(); printer.println(storeName); printer.setTextNormal(); printer.resetLineSpacing(); printer.bold(false);
     if (warungAddress || trx.warungAddress) printer.println(warungAddress || trx.warungAddress);
@@ -103,6 +103,10 @@ function createPrintingService({ app, ipcMain, BrowserWindow, dialog, dataDir, e
       kvLine(printer, "PELANGGAN", `${trx.customerNama}${phone ? ` (${phone})` : ""}`);
     }
     kvLine(printer, "METODE", trx.metodeBayarLabel || trx.metodeBayar || ""); printer.drawLine();
+    (receiptAdditionals || []).filter(field => field.category === "receipt" && field.visible !== false).forEach(field => {
+      const value = trx?.[field.key];
+      if (value !== undefined && value !== null && String(value) !== "") printer.println(`${field.label}: ${value}`);
+    });
     trx.items.forEach((item) => {
       // Langkah 3: unitLabel menandai satuan baris (mis. "2x Dus Teh").
       const unitTag = item.unitLabel ? ` ${item.unitLabel}` : "";
@@ -166,14 +170,14 @@ ipcMain.handle("export-report-pdf", async (_e, { html, defaultName }) => {
       });
     });
   });
-ipcMain.handle("print-receipt-escpos", async (_e, { trx, printerName, paperWidthMm, warungName, warungAddress, warungPhone, operatorName, cats = [], customerEnabled = true }) => {
+ipcMain.handle("print-receipt-escpos", async (_e, { trx, printerName, paperWidthMm, warungName, warungAddress, warungPhone, operatorName, cats = [], customerEnabled = true, receiptAdditionals = [] }) => {
     const selectedName = printerName || "auto";
     try {
       const paperW = normalizePaperWidthMm(paperWidthMm);
       if (!selectedName || /pdf/i.test(selectedName)) return { ok: false, error: "Printer yang dipilih bukan printer thermal. Pilih printer thermal fisik atau gunakan printer sistem/PDF." };
       const printer = new ThermalPrinter({ type: PrinterTypes.EPSON, interface: selectedName === "auto" ? "printer:auto" : `printer:${selectedName}`, ...(nodePrinterDriver ? { driver: nodePrinterDriver } : {}), width: charsPerLineForWidth(paperW), removeSpecialCharacters: false, options: { timeout: 5000 } });
       if (!await printer.isPrinterConnected()) return { ok: false, error: `Printer tidak ditemukan 404: "${selectedName}" tidak terhubung. Pastikan printer terhubung dan driver terinstall.` };
-      buildEscPosReceipt(printer, trx, warungName, warungAddress, warungPhone, operatorName, [...cats, ...(rJSON(files.cats) || [])], customerEnabled);
+      buildEscPosReceipt(printer, trx, warungName, warungAddress, warungPhone, operatorName, [...cats, ...(rJSON(files.cats) || [])], customerEnabled, receiptAdditionals);
       await printer.execute();
       console.log("[ESC/POS] Print successful to:", selectedName);
       return { ok: true };

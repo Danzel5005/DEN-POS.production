@@ -181,6 +181,15 @@ describe("receipt.js - Receipt utilities and HTML builders", () => {
       expect(html).toContain("Terima kasih atas kunjungan Anda");
     });
 
+    it("renders custom receipt add-ons by their label and escapes user values", () => {
+      const trx = { ...mockTrxCash, catatan_pesanan: "Gak pake sayur <b>" };
+      const fields = [{ key: "catatan_pesanan", label: "Catatan", category: "receipt", visible: true }];
+      const html = buildReceiptHTML(trx, null, fields, {});
+      expect(html).toContain("CATATAN");
+      expect(html).toContain("Gak pake sayur &lt;b&gt;");
+      expect(html).not.toContain("Gak pake sayur <b>");
+    });
+
     it("should not render receipt-note blocks when header/footer are empty", () => {
       const html = buildReceiptHTML(mockTrxCash, null, [], {}, "Warung Test");
       expect(html).not.toContain('class="receipt-note"');
@@ -258,6 +267,13 @@ describe("receipt.js - Receipt utilities and HTML builders", () => {
       expect(html).toContain("Header Preview");
       expect(html).toContain("Footer Preview");
       expect(html).toContain('class="receipt-note"');
+    });
+
+    it("renders custom receipt add-ons in the unpaid preview", () => {
+      const fields = [{ key: "catatan_pesanan", label: "Catatan", category: "receipt", visible: true }];
+      const html = buildPreviewHTML({ catatan_pesanan: "Gak pake sayur" }, [], null, fields, "Warung Test");
+      expect(html).toContain("CATATAN");
+      expect(html).toContain("Gak pake sayur");
     });
   });
 });

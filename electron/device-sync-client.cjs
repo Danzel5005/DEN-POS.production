@@ -189,6 +189,14 @@ function createDeviceSyncClient({ identity, baseUrl = "", fetchImpl, timeoutMs =
     return { ok: true, status: res.status, ...(res.data || {}) };
   }
 
+  function sendKdsTicket(payload, { baseUrlOverride } = {}) {
+    return request("POST", "/kds-create-ticket", { body: { payload }, signed: true, baseUrlOverride });
+  }
+
+  function cancelKdsTickets(sourceRef, { baseUrlOverride } = {}) {
+    return request("POST", "/kds-cancel-tickets", { body: { sourceRef: String(sourceRef || "") }, signed: true, baseUrlOverride });
+  }
+
   return {
     setBaseUrl,
     getBaseUrl: () => cachedBaseUrl,
@@ -197,6 +205,8 @@ function createDeviceSyncClient({ identity, baseUrl = "", fetchImpl, timeoutMs =
     heartbeat,
     push,
     stockExchange,
+    sendKdsTicket,
+    cancelKdsTickets,
   };
 }
 

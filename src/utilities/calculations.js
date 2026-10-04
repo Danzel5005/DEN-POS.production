@@ -54,10 +54,21 @@ function calcPrice(subtotal, options = {}) {
   const itemSubtotal = items
     ? items.reduce((sum, item) => sum + asNumber(item.harga) * asNumber(item.qty), 0)
     : asNumber(subtotal);
-  const discountedSubtotal = items
+  const hasManualDiscount = options.manualDiscount?.value !== undefined
+    && options.manualDiscount?.value !== null
+    && String(options.manualDiscount.value).trim() !== "";
+  const manualDiscountValue = Math.max(0, asNumber(options.manualDiscount?.value));
+  const manualDiscountAmount = hasManualDiscount
+    ? Math.min(Math.max(0, itemSubtotal), options.manualDiscount?.type === "percentage"
+      ? itemSubtotal * Math.min(manualDiscountValue, 100) / 100
+      : manualDiscountValue)
+    : null;
+  const discountedSubtotal = hasManualDiscount
+    ? itemSubtotal - manualDiscountAmount
+    : items
     ? calculateDiscountedSubtotal(items, discounts)
     : calculateDiscountedSubtotal([{ id: "", kategori: "", harga: itemSubtotal, qty: 1 }], discounts);
-  const discount = Math.max(0, itemSubtotal - discountedSubtotal);
+  const discount = hasManualDiscount ? manualDiscountAmount : Math.max(0, itemSubtotal - discountedSubtotal);
 
   let base = discountedSubtotal;
   const pajakRate = options.pajak?.enabled === false ? 0 : asNumber(options.pajak?.value);

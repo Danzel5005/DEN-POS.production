@@ -13,7 +13,7 @@ const VOID_REASONS = [
 // useHistoryVoid — domain logic for marking a completed transaction as voided.
 // Void never deletes the sale: it flags it so reports can exclude it while the
 // audit trail (who/when/why) stays intact.
-function useHistoryVoid({ toast_, addUndo, onVoided, applyBahanUsage = null } = {}) {
+function useHistoryVoid({ toast_, addUndo, onVoided, applyBahanUsage = null, kdsEnabledRef = null } = {}) {
   const [voidModal, setVoidModal] = useState(false);
   const [voidTargetId, setVoidTargetId] = useState(null);
   const [voidReason, setVoidReason] = useState("");
@@ -27,6 +27,7 @@ function useHistoryVoid({ toast_, addUndo, onVoided, applyBahanUsage = null } = 
     try {
       const res = await api.voidTrx(id, { reason, actor, note: voidNote });
       if (res && res.ok === false) throw new Error(res.error || "Gagal void transaksi");
+      if (kdsEnabledRef?.current || res?.kdsTicketSent) void api.kdsCancel(String(res?.sourceRef || id));
       // Bahan baku: kembalikan pemakaian transaksi yang di-void (bahan baku ada
       // di renderer; main process hanya tahu stok menu).
       if (applyBahanUsage && Array.isArray(res?.items)) applyBahanUsage(res.items, 1);
@@ -46,7 +47,7 @@ function useHistoryVoid({ toast_, addUndo, onVoided, applyBahanUsage = null } = 
     } finally {
       setIsVoiding(false);
     }
-  }, [toast_, voidNote, onVoided, isVoiding, applyBahanUsage]);
+  }, [toast_, voidNote, onVoided, isVoiding, applyBahanUsage, kdsEnabledRef]);
 
   const openVoidModal = useCallback((id) => {
     if (!id) return;

@@ -14,6 +14,7 @@ function ViewKasir({
   cart, drawerOpen, setDrawerOpen,
   receiptAdditionalValues, receiptAdditionals, updateReceiptAdditionalValue,
   pax, setPax, tableNumber, setTableNumber, paxEnabled = false, tableEnabled = false,
+  manualDiscountConfig = {}, manualDiscountValue = "", setManualDiscountValue = () => {}, checkRequiredManualDiscount = () => true,
   customerPicker = null,
   customerEnabled = true,
   loyaltyTier = null,
@@ -176,6 +177,13 @@ function ViewKasir({
                 )}
               </div>
             ))}
+          {manualDiscountConfig.enabled && <label style={{display:"block",fontSize:10,color:MT,fontWeight:600,marginTop:8}}>
+            Diskon Manual{manualDiscountConfig.required && <span style={{color:"#e84040"}}> *</span>}
+            <div style={{display:"flex",alignItems:"center",gap:6,marginTop:3}}>
+              <input aria-label="Diskon manual" type="number" min="0" max={manualDiscountConfig.type === "percentage" ? 100 : undefined} step="any" value={manualDiscountValue} onChange={event=>setManualDiscountValue(event.target.value)} placeholder="Isi diskon" style={{...inp,fontSize:12}} />
+              <span>{manualDiscountConfig.type === "fixed" ? "Rp" : "%"}</span>
+            </div>
+          </label>}
         </div>}
 
         {/* Header kolom */}
@@ -266,13 +274,13 @@ function ViewKasir({
             )}
             <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:7}}>
               <button onClick={saveOpenBill}
-              disabled={!checkRequiredAdditionals(receiptAdditionals) || stockErrors.length>0}
+              disabled={!checkRequiredAdditionals(receiptAdditionals) || !checkRequiredManualDiscount() || stockErrors.length>0}
               style={{padding:"8px 0",
-              border:`2px solid ${checkRequiredAdditionals(receiptAdditionals)&&stockErrors.length===0?"#a8d5b8":BD}`,
+              border:`2px solid ${checkRequiredAdditionals(receiptAdditionals)&&checkRequiredManualDiscount()&&stockErrors.length===0?"#a8d5b8":BD}`,
               borderRadius:7,
-              background:checkRequiredAdditionals(receiptAdditionals)&&stockErrors.length===0?"#e8f5ee":LT,
-              color:checkRequiredAdditionals(receiptAdditionals)&&stockErrors.length===0?G:MT,
-              cursor:checkRequiredAdditionals(receiptAdditionals)&&stockErrors.length===0?"pointer":"not-allowed",
+              background:checkRequiredAdditionals(receiptAdditionals)&&checkRequiredManualDiscount()&&stockErrors.length===0?"#e8f5ee":LT,
+              color:checkRequiredAdditionals(receiptAdditionals)&&checkRequiredManualDiscount()&&stockErrors.length===0?G:MT,
+              cursor:checkRequiredAdditionals(receiptAdditionals)&&checkRequiredManualDiscount()&&stockErrors.length===0?"pointer":"not-allowed",
               fontFamily:"inherit",fontSize:10,fontWeight:700}}>
                 {activeBill?"Perbarui Open Bill":"Simpan Open Bill"}
               </button>
@@ -289,16 +297,16 @@ fontFamily:"inherit", fontSize:10, fontWeight:700}}>
 {printingPreview ? "Mencetak..." : "Cetak Invoice"}
 </button>
               <button onClick={
-                ()=>checkRequiredAdditionals(receiptAdditionals)&&stockErrors.length===0&&(!paxEnabled||Number(pax)>0)&&setPayModal(true)
+                ()=>checkRequiredAdditionals(receiptAdditionals)&&checkRequiredManualDiscount()&&stockErrors.length===0&&(!paxEnabled||Number(pax)>0)&&setPayModal(true)
               }
-               disabled={!checkRequiredAdditionals(receiptAdditionals) || stockErrors.length>0 || (paxEnabled&&!(Number(pax)>0))}
+               disabled={!checkRequiredAdditionals(receiptAdditionals) || !checkRequiredManualDiscount() || stockErrors.length>0 || (paxEnabled&&!(Number(pax)>0))}
                 style={{
                   padding:"8px 0",
                   border:"none",
                   borderRadius:7,
-                  background:checkRequiredAdditionals(receiptAdditionals)&&stockErrors.length===0&&(!paxEnabled||Number(pax)>0)?OR:"#f0c89a",
+                  background:checkRequiredAdditionals(receiptAdditionals)&&checkRequiredManualDiscount()&&stockErrors.length===0&&(!paxEnabled||Number(pax)>0)?OR:"#f0c89a",
                   color:W,
-                  cursor:checkRequiredAdditionals(receiptAdditionals)&&stockErrors.length===0&&(!paxEnabled||Number(pax)>0)?"pointer":"not-allowed",
+                  cursor:checkRequiredAdditionals(receiptAdditionals)&&checkRequiredManualDiscount()&&stockErrors.length===0&&(!paxEnabled||Number(pax)>0)?"pointer":"not-allowed",
                   fontFamily:"inherit",
                   fontSize:10,
                   fontWeight:700}}>
@@ -311,6 +319,7 @@ fontFamily:"inherit", fontSize:10, fontWeight:700}}>
             {!checkRequiredAdditionals(receiptAdditionals)&&<div style={{fontSize:9,color:"#e84040",
               textAlign:"center",marginTop:4}}>
                 Isi field wajib terlebih dahulu</div>}
+            {!checkRequiredManualDiscount()&&<div style={{fontSize:9,color:"#e84040",textAlign:"center",marginTop:4}}>Isi diskon manual terlebih dahulu</div>}
           </div>
         )}
       </div>

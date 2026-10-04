@@ -89,7 +89,7 @@ const buildAdditionalFields = (data, receiptAdditionals) => {
     .map(field => {
       const val = data?.[field.key];
       if (val === undefined || val === null || val === "") return "";
-      return `<div class="kv"><span class="k">${field.label.toUpperCase()}</span><span class="v">${val}</span></div>`;
+      return `<div class="kv"><span class="k">${escapeHtml(field.label.toUpperCase())}</span><span class="v">${escapeHtml(val)}</span></div>`;
     })
     .join("");
 };

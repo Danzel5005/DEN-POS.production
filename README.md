@@ -223,8 +223,10 @@ Komponen sisi cloud (folder `supabase/`):
 - `supabase/migrations/0001_init.sql` — tabel `stores`, `devices`, `pairing_codes`, `store_users`, `synced_transactions`, `device_nonces`, beserta RLS dan RPC `pair_device(code)`.
 - `supabase/migrations/0002_device_management.sql` — RPC `revoke_device(text)` dan `activate_device(text)`.
 - `supabase/migrations/0003_fix_search_path.sql` — perbaikan `search_path` (`public, extensions`) untuk fungsi security definer (pgcrypto).
+- `supabase/migrations/0005_kds.sql` — tiket KDS, station, RLS, state machine, rate limit, audit status, dan RPC retensi.
 - `supabase/functions/` — Edge Function `devices-register`, `devices-status`, `devices-heartbeat`, dan `sync-upload`.
-- `supabase/config.toml` — konfigurasi `verify_jwt=false` untuk keempat fungsi mesin.
+- `supabase/functions/kds-create-ticket` dan `kds-cancel-tickets` — endpoint KDS bertanda tangan HMAC.
+- `supabase/config.toml` — konfigurasi `verify_jwt=false` untuk fungsi mesin.
 
 Web-app pemantau ada di folder `monitoring-frontend/` (React + Vite) dan memakai Supabase Auth + RLS pada project yang sama. Halaman utamanya mencakup Laporan, Riwayat, Data Tersinkron, Perangkat (pairing/revoke), dan Akun.
 
@@ -232,7 +234,7 @@ Panduan operasional: `supabase/PANDUAN-PHASE-B.md` (setup backend), `monitoring-
 
 Catatan:
 
-- Endpoint Edge Function **tidak** diperbarui otomatis. Setelah mengubah `supabase/functions/**`, jalankan `supabase functions deploy <nama>`.
+- Endpoint Edge Function **tidak** diperbarui otomatis. Deploy `kds-create-ticket` dan `kds-cancel-tickets` saat mengaktifkan KDS.
 - Perubahan pada `electron/*.cjs` memerlukan restart aplikasi POS.
 - Rotasi credential perangkat mengubah `deviceId` + secret dan melepas pairing, sehingga perangkat harus dipasangkan ulang.
 

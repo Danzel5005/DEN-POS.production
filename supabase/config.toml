@@ -40,3 +40,9 @@ verify_jwt = false
 
 [functions.stock-exchange]
 verify_jwt = false
+
+[functions.kds-create-ticket]
+verify_jwt = false
+
+[functions.kds-cancel-tickets]
+verify_jwt = false

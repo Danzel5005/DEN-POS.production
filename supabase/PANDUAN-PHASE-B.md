@@ -95,7 +95,7 @@ where table_schema = 'public'
 
 ## 5. Deploy Edge Functions
 
-`config.toml` sudah menyetel `verify_jwt = false` untuk keempat fungsi mesin
+`config.toml` sudah menyetel `verify_jwt = false` untuk fungsi mesin
 (karena auth-nya HMAC device, bukan JWT). Cukup:
 
 ```powershell
@@ -103,11 +103,13 @@ supabase functions deploy devices-register
 supabase functions deploy devices-status
 supabase functions deploy devices-heartbeat
 supabase functions deploy sync-upload
+supabase functions deploy kds-create-ticket
+supabase functions deploy kds-cancel-tickets
 ```
 
 Atau sekaligus:
 ```powershell
-supabase functions deploy devices-register devices-status devices-heartbeat sync-upload
+supabase functions deploy devices-register devices-status devices-heartbeat sync-upload kds-create-ticket kds-cancel-tickets
 ```
 
 > `SUPABASE_URL` dan `SUPABASE_SERVICE_ROLE_KEY` otomatis tersedia di runtime
@@ -126,7 +128,7 @@ Edge Function yang sudah di-deploy **tidak ikut berubah** saat Anda mengedit
 file di repo. Setiap kali `supabase/functions/**` diubah, deploy ulang:
 
 ```powershell
-supabase functions deploy devices-register devices-status devices-heartbeat sync-upload
+supabase functions deploy devices-register devices-status devices-heartbeat sync-upload kds-create-ticket kds-cancel-tickets
 ```
 
 ### Perbaikan penting: GET tidak boleh mengirim body

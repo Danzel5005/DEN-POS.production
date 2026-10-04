@@ -397,6 +397,22 @@ async deleteTrx(id, opts) {
     if (window.kasirAPI?.devicePendingCount) return safeIpc("Jumlah data tertunda", () => window.kasirAPI.devicePendingCount());
     return 0;
   },
+  async kdsSend(tickets) {
+    if (window.kasirAPI?.kdsSend) return safeIpc("Kirim tiket KDS", () => window.kasirAPI.kdsSend(tickets));
+    return { ok: false, error: "Hanya tersedia di aplikasi desktop" };
+  },
+  async kdsCancel(sourceRef) {
+    if (window.kasirAPI?.kdsCancel) return safeIpc("Batalkan tiket KDS", () => window.kasirAPI.kdsCancel(sourceRef));
+    return { ok: false, error: "Hanya tersedia di aplikasi desktop" };
+  },
+  async kdsStatus() {
+    if (window.kasirAPI?.kdsStatus) return safeIpc("Status antrean KDS", () => window.kasirAPI.kdsStatus());
+    return { pendingCount: 0, error: null, offline: false };
+  },
+  async kdsRetry() {
+    if (window.kasirAPI?.kdsRetry) return safeIpc("Ulangi pengiriman KDS", () => window.kasirAPI.kdsRetry());
+    return { ok: false, error: "Hanya tersedia di aplikasi desktop" };
+  },
   async devicePushTransactions() {
     if (window.kasirAPI?.devicePushTransactions) return safeIpc("Kirim transaksi", () => window.kasirAPI.devicePushTransactions());
     return { ok: false, error: "Hanya tersedia di aplikasi desktop" };

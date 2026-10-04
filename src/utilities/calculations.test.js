@@ -127,4 +127,27 @@ describe("calculations.js - calcPrice", () => {
     expect(res.discount).toBe(500);
     expect(res.total).toBe(13500);
   });
+
+  it("manual percentage discount replaces configured discounts before tax and service", () => {
+    const res = calcPrice(0, {
+      items: [{ id: "coffee", harga: 100000, qty: 1 }],
+      discounts: [{ type: "fixed", value: 50000, scope: "global" }],
+      manualDiscount: { type: "percentage", value: 10 },
+      pajak: { enabled: true, value: 10 },
+      service: { enabled: true, value: 5 },
+    });
+    expect(res.discount).toBe(10000);
+    expect(res.pajak).toBe(9000);
+    expect(res.service).toBe(4950);
+    expect(res.total).toBe(103950);
+  });
+
+  it("caps manual nominal discount at subtotal and falls back to configured rules when blank", () => {
+    const options = {
+      items: [{ id: "tea", harga: 10000, qty: 1 }],
+      discounts: [{ type: "percentage", value: 10, scope: "global" }],
+    };
+    expect(calcPrice(0, { ...options, manualDiscount: { type: "fixed", value: 20000 } }).total).toBe(0);
+    expect(calcPrice(0, { ...options, manualDiscount: { type: "fixed", value: "" } }).total).toBe(9000);
+  });
 });

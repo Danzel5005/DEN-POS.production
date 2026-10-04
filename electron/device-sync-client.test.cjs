@@ -163,6 +163,23 @@ describe("device-sync-client: stock exchange", () => {
   });
 });
 
+describe("device-sync-client: KDS", () => {
+  it("posts ticket payloads and cancellations to signed KDS endpoints", async () => {
+    fetchImpl = makeFetch({ body: { ok: true } });
+    const c = createDeviceSyncClient({ identity, baseUrl: "https://api.example.com", fetchImpl });
+    await c.sendKdsTicket({ client_ticket_id: "ticket-1" });
+    await c.cancelKdsTickets("bill-1");
+
+    expect(fetchImpl.calls.map(({ url }) => url)).toEqual([
+      "https://api.example.com/kds-create-ticket",
+      "https://api.example.com/kds-cancel-tickets",
+    ]);
+    expect(JSON.parse(fetchImpl.calls[0].init.body)).toEqual({ payload: { client_ticket_id: "ticket-1" } });
+    expect(JSON.parse(fetchImpl.calls[1].init.body)).toEqual({ sourceRef: "bill-1" });
+    expect(fetchImpl.calls.every(({ init }) => verifyHeaders(init, identity.getSecretHash()))).toBe(true);
+  });
+});
+
 // ---------------------------------------------------------------------------
 // Regresi: GET TIDAK boleh mengirim body (fetch melempar
 // "Request with GET/HEAD method cannot have body"), TETAPI tanda tangan tetap

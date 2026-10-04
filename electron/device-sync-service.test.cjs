@@ -141,6 +141,57 @@ describe("device-sync-service: push", () => {
   });
 });
 
+describe("device-sync-service: KDS outbox", () => {
+  it("persists offline tickets, deduplicates retries, then drains after reconnect", async () => {
+    let attempt = 0;
+    build(() => (++attempt === 1
+      ? { status: 503, body: { error: "TEMPORARY_OUTAGE" } }
+      : { body: { ok: true } }), { autoSyncIntervalMs: 0, stockSyncIntervalMs: 0 });
+    svc.setBaseUrl("https://cloud.denpos.id/functions/v1");
+    const ticket = { client_ticket_id: "dev:bill:1:station:order", source_ref: "bill-1" };
+
+    const queued = await svc.kdsSend([ticket]);
+    expect(queued).toMatchObject({ ok: true, pendingCount: 1 });
+    expect(await svc.kdsSend([ticket])).toMatchObject({ ok: true, queued: 0, pendingCount: 1 });
+    expect(JSON.parse(fs.readFileSync(path.join(dir, "device-sync.json"), "utf8")).kdsOutbox).toHaveLength(1);
+
+    identity.markRegistered("store_1");
+    expect(await svc.flushKdsOutbox()).toMatchObject({ ok: false, pendingCount: 1 });
+    const retried = await svc.flushKdsOutbox();
+    expect(retried).toMatchObject({ ok: true, pendingCount: 0 });
+    expect(JSON.parse(fs.readFileSync(path.join(dir, "device-sync.json"), "utf8")).kdsOutbox).toEqual([]);
+    expect(fetchImpl.calls).toHaveLength(2);
+  });
+
+  it("queues cancellation commands while offline", async () => {
+    build({}, { autoSyncIntervalMs: 0, stockSyncIntervalMs: 0 });
+    const res = await svc.kdsCancel("bill-22");
+    expect(res).toMatchObject({ ok: true, pendingCount: 1 });
+    expect(JSON.parse(fs.readFileSync(path.join(dir, "device-sync.json"), "utf8")).kdsOutbox[0]).toMatchObject({ type: "cancel", sourceRef: "bill-22" });
+  });
+
+  it("returns after durable enqueue without waiting for the cloud request", async () => {
+    let finishRequest;
+    build({}, {
+      autoSyncIntervalMs: 0,
+      stockSyncIntervalMs: 0,
+      client: {
+        sendKdsTicket: () => new Promise((resolve) => { finishRequest = resolve; }),
+        cancelKdsTickets: async () => ({ ok: true }),
+      },
+    });
+    svc.setBaseUrl("https://cloud.denpos.id/functions/v1");
+    identity.markRegistered("store_1");
+
+    const queued = await svc.kdsSend([{ client_ticket_id: "ticket-nonblocking" }]);
+    expect(queued).toMatchObject({ ok: true, pendingCount: 1 });
+    expect(finishRequest).toBeTypeOf("function");
+    finishRequest({ ok: true });
+    await svc.flushKdsOutbox();
+    expect(svc.getKdsStatus().pendingCount).toBe(0);
+  });
+});
+
 describe("device-sync-service: stock exchange", () => {
   it("mengirim full pertama, hanya delta berikutnya, dan membersihkan ack setelah sukses", async () => {
     let rows = [{ id: "m1", type: "menu", name: "Kopi", stock: 4 }];
@@ -232,6 +283,10 @@ describe("device-sync-service: IPC handlers", () => {
       "device-push-sync",
       "device-push-transactions",
       "device-pending-count",
+      "kds-send",
+      "kds-cancel",
+      "kds-status",
+      "kds-retry",
       "device-credential",
       "device-rotate-credential",
       "device-set-name",

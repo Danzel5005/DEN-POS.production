@@ -11,6 +11,7 @@ import {
   UsersSettingsTab,
   AdvancedSettingsTab,
   CloudSyncSettingsTab,
+  KdsSettingsTab,
 } from "./settings-tabs/index.js";
 import { useDeviceSync } from "../../hooks/useDeviceSync.js";
 
@@ -25,6 +26,7 @@ const SETTINGS_TABS = [
   ["users", "Kelola Pengguna"],
   ["advanced", "Fitur Lanjutan"],
   ["cloud", "Sync Cloud"],
+  ["kds", "KDS"],
 ];
 
 function SettingsTabButton({ tab, activeTab, onSelect, children }) {
@@ -44,6 +46,7 @@ function SettingsPanel({ tab, settingsH, authH, menu, cats, deviceH }) {
     case "users": return <UsersSettingsTab authH={authH} />;
     case "advanced": return <AdvancedSettingsTab {...panelProps} />;
     case "cloud": return <CloudSyncSettingsTab authH={authH} deviceH={deviceH} />;
+    case "kds": return <KdsSettingsTab settingsH={settingsH} cats={cats} deviceH={deviceH} />;
     default: return null;
   }
 }

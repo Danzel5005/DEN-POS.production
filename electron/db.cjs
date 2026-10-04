@@ -628,7 +628,7 @@ function createDatabaseService({ ipcMain, files, ensureDir, rJSON, atomicWrite, 
         if (menu && menu.length) atomicWrite(files.menu, menu);
         const updated = all.map(t => String(t.id) === String(id) ? { ...t, ...patch } : t);
         atomicWrite(files.trx, updated);
-        return { ok: true, menu, items: Array.isArray(found.items) ? found.items : [] };
+        return { ok: true, menu, items: Array.isArray(found.items) ? found.items : [], sourceRef: found.kdsSourceRef || found.id, kdsTicketSent: found.kdsTicketSent === true };
       }
       try {
         const row = db.prepare("SELECT data FROM transactions WHERE id = ?").get(id);
@@ -647,7 +647,7 @@ function createDatabaseService({ ipcMain, files, ensureDir, rJSON, atomicWrite, 
         run();
         menu = loadMenuList();
         atomicWrite(files.menu, menu); // cermin untuk backup lama & fallback
-        return { ok: true, menu, items: Array.isArray(current.items) ? current.items : [] };
+        return { ok: true, menu, items: Array.isArray(current.items) ? current.items : [], sourceRef: current.kdsSourceRef || current.id, kdsTicketSent: current.kdsTicketSent === true };
       } catch (err) {
         console.error("[trx-void] Error:", err.message);
         return { ok: false, error: err.message };
