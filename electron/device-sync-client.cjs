@@ -189,6 +189,10 @@ function createDeviceSyncClient({ identity, baseUrl = "", fetchImpl, timeoutMs =
     return { ok: true, status: res.status, ...(res.data || {}) };
   }
 
+  async function attendanceExchange(payload = {}, { baseUrlOverride } = {}) {
+    return request("POST", "/attendance-exchange", { body: payload, signed: true, baseUrlOverride });
+  }
+
   function sendKdsTicket(payload, { baseUrlOverride } = {}) {
     return request("POST", "/kds-create-ticket", { body: { payload }, signed: true, baseUrlOverride });
   }
@@ -205,6 +209,7 @@ function createDeviceSyncClient({ identity, baseUrl = "", fetchImpl, timeoutMs =
     heartbeat,
     push,
     stockExchange,
+    attendanceExchange,
     sendKdsTicket,
     cancelKdsTickets,
   };

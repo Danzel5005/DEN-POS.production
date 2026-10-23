@@ -2,7 +2,7 @@ const { hashPassword, verifyPasswordWithLegacy, isHashed } = require("./auth.cjs
 
 // Handler autentikasi dipisah dari main.cjs supaya bisa diuji tanpa Electron.
 // `ipcMain` cukup punya `.handle(name, fn)`; `store` butuh `read()`/`write(list)`.
-function registerAuthHandlers({ ipcMain, store }) {
+function registerAuthHandlers({ ipcMain, store, onAuthenticatedUser = () => {}, onSessionClear = () => {} }) {
   // Login: verifikasi password. Bila user masih memakai plaintext lama (data
   // sebelum hashing) dan login SUKSES, langsung di-upgrade ke hash scrypt.
   ipcMain.handle("auth-login", (_e, { username, password } = {}) => {
@@ -25,8 +25,11 @@ function registerAuthHandlers({ ipcMain, store }) {
     }
 
     const { password: _pw, ...safeUser } = users[index];
+    onAuthenticatedUser(safeUser);
     return { ok: true, user: safeUser, migrated };
   });
+
+  ipcMain.handle("auth-session-clear", () => { onSessionClear(); return { ok: true }; });
 
   // Set / ubah password: selalu disimpan dalam bentuk hash.
   ipcMain.handle("auth-set-password", (_e, { username, newPassword } = {}) => {

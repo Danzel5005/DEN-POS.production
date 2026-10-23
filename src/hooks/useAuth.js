@@ -86,7 +86,7 @@ function useAuth({ getNow, toast_ }) {
   // PENTING: membaca loginForm, shifts, dan getNow LANGSUNG dari closure.
   // Verifikasi password sekarang dilakukan di MAIN PROCESS (scrypt hash);
   // renderer tidak lagi membandingkan password mentah.
-  const doLogin = useCallback(async () => {
+  const doLogin = useCallback(async (beforeOpenShift) => {
     const result = await api.authLogin({ username: loginForm.username, password: loginForm.password });
     if (!result?.ok || !result.user) {
       setLoginForm(f => ({ ...f, error: "Username atau password salah" }));
@@ -120,11 +120,13 @@ function useAuth({ getNow, toast_ }) {
       openingCash: 0,
       expenses: [],
     };
-    const next = [...shifts, shift];
+    const preparedShift = typeof beforeOpenShift === "function" ? await beforeOpenShift(shift) : shift;
+    if (!preparedShift) return false;
+    const next = [...shifts, preparedShift];
     await api.saveShifts(next);
     setShifts(next);
-    setActiveShift(shift);
-    setSelectedShiftId(shift.id);
+    setActiveShift(preparedShift);
+    setSelectedShiftId(preparedShift.id);
     // Simpan user yang login saat ini (untuk cek hak admin saat kelola pengguna)
     setCurrentUser(u);
     // Persist identitas sesi supaya hak admin tetap ada setelah reload/restart.
@@ -168,6 +170,7 @@ function useAuth({ getNow, toast_ }) {
     // supaya user harus login lagi (dan tidak "bangun" sebagai admin lama).
     setCurrentUser(null);
     LS(SESSION_KEY, null);
+    await api.authSessionClear?.();
     // HAPUS: clearBills() — open bill TIDAK dihapus otomatis
     // Open bill hanya dihapus melalui proses bayar (processPayment) yang memanggil removeBillLocal
     clearCart();

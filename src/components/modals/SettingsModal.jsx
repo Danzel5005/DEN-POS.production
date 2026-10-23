@@ -14,6 +14,8 @@ import {
   KdsSettingsTab,
 } from "./settings-tabs/index.js";
 import { useDeviceSync } from "../../hooks/useDeviceSync.js";
+import WebAttendanceUsersTab from "./WebAttendanceUsersTab.jsx";
+import { isAdmin } from "../../utilities/permissions.js";
 
 const SETTINGS_TABS = [
   ["printer", "Printer"],
@@ -27,6 +29,7 @@ const SETTINGS_TABS = [
   ["advanced", "Fitur Lanjutan"],
   ["cloud", "Sync Cloud"],
   ["kds", "KDS"],
+  ["web-users", "User Web-App"],
 ];
 
 function SettingsTabButton({ tab, activeTab, onSelect, children }) {
@@ -47,6 +50,7 @@ function SettingsPanel({ tab, settingsH, authH, menu, cats, deviceH }) {
     case "advanced": return <AdvancedSettingsTab {...panelProps} />;
     case "cloud": return <CloudSyncSettingsTab authH={authH} deviceH={deviceH} />;
     case "kds": return <KdsSettingsTab settingsH={settingsH} cats={cats} deviceH={deviceH} />;
+    case "web-users": return <WebAttendanceUsersTab isAdmin={isAdmin(authH.currentUser)} />;
     default: return null;
   }
 }
@@ -66,7 +70,7 @@ export default function SettingsModal({ settingsH, authH, menu = [], cats = [] }
       </div>
       <div style={{ display: "flex", flex: 1, minHeight: 0, marginBottom: 14, border: `1px solid ${BD}`, borderRadius: RADIUS.md, overflow: "hidden" }}>
         <aside style={{ width: 146, minWidth: 146, boxSizing: "border-box", background: G, display: "flex", flexDirection: "column", flexShrink: 0, overflowY: "auto" }}>
-          {SETTINGS_TABS.map(([key, label]) => <SettingsTabButton key={key} tab={key} activeTab={tab} onSelect={setTab}>{label}</SettingsTabButton>)}
+          {SETTINGS_TABS.filter(([key]) => key !== "web-users" || isAdmin(authH.currentUser)).map(([key, label]) => <SettingsTabButton key={key} tab={key} activeTab={tab} onSelect={setTab}>{label}</SettingsTabButton>)}
         </aside>
         <div style={{ flex: 1, overflowY: "auto", padding: 16, minWidth: 0 }}>
           <SettingsPanel tab={tab} settingsH={settingsH} authH={authH} menu={menu} cats={cats} deviceH={deviceH} />

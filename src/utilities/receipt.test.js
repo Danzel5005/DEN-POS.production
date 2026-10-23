@@ -94,6 +94,12 @@ describe("receipt.js - Receipt utilities and HTML builders", () => {
       expect(html).not.toContain("Kembalian Rp. -8.300");
     });
 
+    it("prints a zero transaction total instead of falling back to the subtotal", () => {
+      const html = buildReceiptHTML({ ...mockTrxCash, subtotal: 50000, discount: 50000, total: 0, bayar: 0 }, null, [], {});
+      expect(html).toContain('<span class="k">TOTAL</span><span class="v">Rp 0</span>');
+      expect(html).toContain('<span class="k">Diskon</span><span class="v">-Rp 50.000</span>');
+    });
+
     it("should render QRIS image when provided", () => {
       const trxQris = { ...mockTrxCash, metodeBayar: "qris-bca" };
       const qrisImages = { "qris-bca": "data:image/png;base64,qrisimage" };

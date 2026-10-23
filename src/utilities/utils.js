@@ -397,6 +397,10 @@ async deleteTrx(id, opts) {
     if (window.kasirAPI?.devicePendingCount) return safeIpc("Jumlah data tertunda", () => window.kasirAPI.devicePendingCount());
     return 0;
   },
+  async deviceAttendanceExchange(payload) {
+    if (window.kasirAPI?.deviceAttendanceExchange) return safeIpc("Sinkronisasi presensi", () => window.kasirAPI.deviceAttendanceExchange(payload));
+    return { ok: false, error: "Sinkronisasi presensi hanya tersedia di aplikasi desktop" };
+  },
   async kdsSend(tickets) {
     if (window.kasirAPI?.kdsSend) return safeIpc("Kirim tiket KDS", () => window.kasirAPI.kdsSend(tickets));
     return { ok: false, error: "Hanya tersedia di aplikasi desktop" };
@@ -452,6 +456,7 @@ async deleteTrx(id, opts) {
     const { password: _pw, ...safeUser } = found;
     return { ok: true, user: safeUser, migrated: false };
   },
+  async authSessionClear() { return window.kasirAPI?.authSessionClear?.(); },
   async authCreateUser({ user } = {}) {
     if (window.kasirAPI?.authCreateUser) return safeIpc("Tambah pengguna", () => window.kasirAPI.authCreateUser({ user }));
     const users = LS("ykk_users") || [];

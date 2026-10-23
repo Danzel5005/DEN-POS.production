@@ -1,3 +1,4 @@
+let currentSoftwareUser = null;
 const { app, BrowserWindow, ipcMain, dialog } = require("electron");
 const path = require("path");
 const fs = require("fs");
@@ -96,6 +97,7 @@ const deviceSync = createDeviceSyncService({
   applyMenuRestockProvider: (event) => database.applyRemoteMenuRestock(event),
   claimIngredientRestockProvider: (event) => database.claimIngredientRestock(event),
   completeIngredientRestockProvider: (eventId) => database.completeIngredientRestock(eventId),
+    authorizeAttendanceManagement: () => currentSoftwareUser?.role === "admin" || currentSoftwareUser?.username === "admin",
   // Peringatan/sukses sync diteruskan ke renderer (toast "gagal kirim" dsb.).
   notify: (payload) => {
     for (const w of BrowserWindow.getAllWindows()) {
@@ -173,6 +175,8 @@ function startRawScannerFallback(win) {
 registerFileHandlers();
 registerAuthHandlers({
   ipcMain,
+  onAuthenticatedUser: (user) => { currentSoftwareUser = user; },
+  onSessionClear: () => { currentSoftwareUser = null; },
   store: {
     read: () => backup.rJSON(FILES.users) || [],
     write: (list) => backup.atomicWrite(FILES.users, list),
@@ -202,6 +206,8 @@ app.whenReady().then(() => {
     database.initDB();
     database.migrateJSONToSQLite();
     database.migrateMenuToProducts();
+    const openShift = database.loadShifts().find((shift) => shift.status === "open");
+    currentSoftwareUser = (backup.rJSON(FILES.users) || []).find((user) => user.username === openShift?.username) || null;
     backup.walRecover();
     backup.dailyBackup();
     // Mulai auto-sync 5 menit HANYA jika perangkat sudah dipasangkan & URL diatur.

@@ -31,6 +31,7 @@ function createDeviceSyncService({
   applyMenuRestockProvider = () => ({ ok: false, error: "Database belum siap" }),
   claimIngredientRestockProvider = () => ({ ok: false, error: "Database belum siap" }),
   completeIngredientRestockProvider = () => ({ ok: false, error: "Database belum siap" }),
+  authorizeAttendanceManagement = () => false,
   stockSyncIntervalMs = 60 * 1000,
 } = {}) {
   if (!identity) throw new Error("createDeviceSyncService: identity wajib diisi");
@@ -348,6 +349,16 @@ function createDeviceSyncService({
     }
   }
 
+  async function attendanceExchange(payload = {}) {
+    if (!getBaseUrl()) return { ok: false, error: "URL backend belum diatur" };
+    if (!identity.isRegistered()) return { ok: false, error: "Perangkat belum dipasangkan" };
+    if (["members-list", "member-role", "member-revoke", "attendance-radius-set"].includes(payload.action) && !authorizeAttendanceManagement()) {
+      return { ok: false, error: "Hanya admin DEN POS yang dapat mengelola pengguna web-app." };
+    }
+    try { return await ensureClient().attendanceExchange(payload); }
+    catch (err) { return { ok: false, error: err?.message || "Sinkronisasi presensi gagal", offline: true }; }
+  }
+
   function queueRestockAck(ack) {
     if (!ack?.eventId || !["applied", "rejected"].includes(ack.status)) return { ok: false, error: "Ack tidak valid" };
     const existing = readConfig().stockAcks || [];
@@ -450,6 +461,7 @@ function createDeviceSyncService({
     ipcMain.handle("device-push-sync", (_e, batch) => push(batch || {}));
     ipcMain.handle("device-push-transactions", () => pushTransactions());
     ipcMain.handle("device-stock-exchange", () => exchangeStock());
+    ipcMain.handle("device-attendance-exchange", (_e, payload) => attendanceExchange(payload || {}));
     ipcMain.handle("device-restock-ack", (_e, ack) => queueRestockAck(ack));
     ipcMain.handle("device-claim-restock", (_e, eventId) => claimRestock(eventId));
     ipcMain.handle("device-apply-menu-restock", (_e, event) => applyMenuRestockProvider(event));
@@ -464,7 +476,7 @@ function createDeviceSyncService({
     ipcMain.handle("device-rotate-credential", () => rotateCredential());
     ipcMain.handle("device-set-name", (_e, name) => setDeviceName(name));
     syncAutoSyncState();
-    return { getStatus, getIdentity, register, checkPairing, push, pushTransactions, exchangeStock, kdsSend, kdsCancel, getKdsStatus, flushKdsOutbox, startAutoSync: maybeStartAutoSync, stopAutoSync, stopStockSync };
+    return { getStatus, getIdentity, register, checkPairing, push, pushTransactions, exchangeStock, attendanceExchange, kdsSend, kdsCancel, getKdsStatus, flushKdsOutbox, startAutoSync: maybeStartAutoSync, stopAutoSync, stopStockSync };
   }
 
   return {
@@ -478,6 +490,7 @@ function createDeviceSyncService({
     push,
     pushTransactions,
     exchangeStock,
+    attendanceExchange,
     queueRestockAck,
     claimRestock,
     applyMenuRestock: applyMenuRestockProvider,

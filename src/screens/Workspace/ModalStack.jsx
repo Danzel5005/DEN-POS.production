@@ -22,6 +22,7 @@ export default function ModalStack({
   setReceipt,
   menuH,
   confirmCloseShift,
+  closeShiftWarning = [],
   openingCashModal,
   openingCashInput,
   setOpeningCashInput,
@@ -90,7 +91,7 @@ export default function ModalStack({
 
       {/* ══ MODAL: KONFIRMASI TUTUP SHIFT ════════════════════════════════ */}
       {authH.closingShift && (
-        <CloseShiftModal authH={authH} confirmCloseShift={confirmCloseShift} />
+        <CloseShiftModal authH={authH} confirmCloseShift={confirmCloseShift} pendingAttendance={closeShiftWarning} />
       )}
 
       {/* ══ MODAL: MASUKAN UANG KAS ════════════════════════════════════════ */}

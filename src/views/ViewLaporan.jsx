@@ -9,6 +9,36 @@ import { buildCashFlow } from "../utilities/cashflow.js";
 import { buildReportHTML } from "../utilities/reportHtml.js";
 import CashFlowShifts from "../components/CashFlowShifts.jsx";
 
+function AttendanceReportSection({ toast_ }) {
+  const [rows, setRows] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [exporting, setExporting] = useState(false);
+  useEffect(() => {
+    let alive = true;
+    api.deviceAttendanceExchange({ action: "attendance-log" }).then((result) => {
+      if (alive && result?.ok) setRows(result.data?.rows || []);
+      if (alive) setLoading(false);
+    }).catch(() => { if (alive) setLoading(false); });
+    return () => { alive = false; };
+  }, []);
+  const exportPdf = async () => {
+    setExporting(true);
+    const escapeHtml = (value) => String(value ?? "").replace(/[&<>"']/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[char]);
+    const body = rows.map((row) => `<tr><td>${escapeHtml(row.attendance_shifts?.shift_num || "-")}</td><td>${escapeHtml(row.user_label)}</td><td>${escapeHtml(new Date(row.checked_in_at).toLocaleString("id-ID"))}</td><td>${escapeHtml(row.checked_out_at ? new Date(row.checked_out_at).toLocaleString("id-ID") : "Belum presensi keluar")}</td><td>${escapeHtml(row.checkout_overwritten ? "Ditutup admin DEN POS" : row.status)}</td></tr>`).join("");
+    const html = `<!doctype html><meta charset="utf-8"><h1>Log Presensi</h1><p>Dicetak ${escapeHtml(new Date().toLocaleString("id-ID"))}</p><table border="1" cellspacing="0" cellpadding="6"><thead><tr><th>Shift</th><th>Pengguna</th><th>Masuk</th><th>Keluar</th><th>Status</th></tr></thead><tbody>${body}</tbody></table>`;
+    try {
+      const result = await api.exportReportPdf({ html, defaultName: "Log-Presensi.pdf" });
+      if (result?.ok) toast_?.("Log presensi PDF disimpan", "ok");
+      else if (result?.error && result.error !== "Dibatalkan") toast_?.(result.error, "err");
+    } catch (error) { toast_?.(error.message || "Gagal mengekspor log presensi", "err"); }
+    finally { setExporting(false); }
+  };
+  return <section style={{ borderTop: `1px solid ${BD}`, paddingTop: 14, marginTop: 18 }}>
+    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, marginBottom: 8 }}><div><b style={{ color: G, fontSize: 12 }}>Log Presensi</b><div style={{ color: MT, fontSize: 10 }}>{loading ? "Memuat…" : `${rows.length} catatan terbaru`}</div></div><button type="button" disabled={!rows.length || exporting} onClick={exportPdf} style={{ background: G, color: W, border: 0, borderRadius: 6, padding: "8px 12px", fontWeight: 700, cursor: rows.length ? "pointer" : "not-allowed" }}>{exporting ? "Menyiapkan…" : "Ekspor PDF"}</button></div>
+    <div style={{ overflowX: "auto", background: W, border: `1px solid ${BD}` }}><table style={{ width: "100%", minWidth: 640, borderCollapse: "collapse", fontSize: 10 }}><thead><tr>{["Shift", "Pengguna", "Masuk", "Keluar", "Status"].map((label) => <th key={label} style={{ padding: 8, textAlign: "left", borderBottom: `1px solid ${BD}` }}>{label}</th>)}</tr></thead><tbody>{rows.slice(0, 100).map((item) => <tr key={item.id}><td style={{ padding: 8 }}>Shift {item.attendance_shifts?.shift_num || "-"}</td><td style={{ padding: 8 }}>{item.user_label}</td><td style={{ padding: 8 }}>{new Date(item.checked_in_at).toLocaleString("id-ID")}</td><td style={{ padding: 8 }}>{item.checked_out_at ? new Date(item.checked_out_at).toLocaleString("id-ID") : "Belum keluar"}</td><td style={{ padding: 8 }}>{item.checkout_overwritten ? "Ditutup admin" : item.status}</td></tr>)}</tbody></table>{!loading && !rows.length && <p style={{ padding: 10, color: MT, fontSize: 11 }}>Belum ada log presensi.</p>}</div>
+  </section>;
+}
+
 // ViewLaporan — laporan keuangan & penjualan per shift, dengan CSV export.
 function ViewLaporan({
   selectedShiftId, setSelectedShiftId,   // authH
@@ -447,6 +477,8 @@ const rev=shiftTrx.reduce((s,t)=>s+paidOf(t),0);
           )}
         </div>
       )}
+
+      <AttendanceReportSection toast_={toast_} />
 
 
       {selectedExpenseCategory && (

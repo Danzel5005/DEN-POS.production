@@ -46,3 +46,6 @@ verify_jwt = false
 
 [functions.kds-cancel-tickets]
 verify_jwt = false
+
+[functions.attendance-exchange]
+verify_jwt = false

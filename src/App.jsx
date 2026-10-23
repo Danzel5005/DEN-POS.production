@@ -185,6 +185,7 @@ function KasirWorkspace() {
   // harus tahu tentang domain lain (melanggar constraint "no cross-hook
   // import") — jadi dia tinggal di coordinator level.
   const [confirmDel, setConfirmDel] = useState(null);
+  const [closeShiftWarning, setCloseShiftWarning] = useState([]);
 
   // ── Snake loader state for button actions
   const [showSnakeLoader, setShowSnakeLoader] = useState(false);
@@ -213,7 +214,30 @@ function KasirWorkspace() {
   const handleLogin = useCallback(async () => {
     if (!authH.loginForm.username || !authH.loginForm.password || showSnakeLoader) return;
 
-    const ok = await authH.doLogin();
+    const ok = await authH.doLogin(async (shift) => {
+      const status = await api.deviceStatus();
+      if (!status?.identity?.registered) return shift;
+      let position;
+      try {
+        position = await new Promise((resolve, reject) => {
+          if (!navigator.geolocation) { reject(new Error("GPS tidak tersedia")); return; }
+          navigator.geolocation.getCurrentPosition(resolve, reject, { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 });
+        });
+      } catch (error) {
+        const reason = error?.code === 1 ? "Izin lokasi ditolak. Aktifkan izin lokasi DEN POS di pengaturan Windows, lalu coba lagi." : "Lokasi tidak ditemukan. Aktifkan Layanan Lokasi/GPS, matikan mode pesawat, dan coba di area terbuka.";
+        toastH.toast_(reason, "err");
+        return null;
+      }
+      const result = await api.deviceAttendanceExchange({ action: "shift-open", shift: {
+        id: shift.id, shiftNum: shift.shiftNum, operator: shift.operator, openedAt: shift.startTime,
+        latitude: position.coords.latitude, longitude: position.coords.longitude, accuracy: position.coords.accuracy,
+      } });
+      if (!result?.ok) {
+        toastH.toast_(result?.error || "Lokasi shift gagal disinkronkan. Periksa koneksi internet.", "err");
+        return null;
+      }
+      return { ...shift, attendanceShiftId: result.data?.shiftId, attendanceRadiusM: result.data?.radiusM };
+    });
     if (!ok) return;
 
     setSnakeLoaderTrigger("login");
@@ -223,7 +247,7 @@ function KasirWorkspace() {
     setShowSnakeLoader(false);
     setLoginTransitioning(false);
     setOpeningCashModal(true);
-  }, [authH, showSnakeLoader])
+  }, [authH, showSnakeLoader, toastH.toast_])
 
   // ── Receipt & Pay modal — UI state yang menjembatani cart+history, tetap di App.jsx
   const [payModal, setPayModal] = useState(false);
@@ -339,9 +363,23 @@ function KasirWorkspace() {
   // confirmCloseShift butuh clearCart saja — clearBills DIHAPUS
   // Open bill TIDAK PERNAH dihapus otomatis saat tutup shift
   // (hanya dihapus jika sudah dibayar via processPayment -> removeBillLocal)
-  const confirmCloseShift = useCallback(() => authH.confirmCloseShift({
-    clearCart: cartH.clearCart,
-  }), [authH.confirmCloseShift, cartH.clearCart]);
+  const confirmCloseShift = useCallback(async (overwrite = false) => {
+    const shiftId = authH.activeShift?.attendanceShiftId;
+    if (shiftId) {
+      const result = await api.deviceAttendanceExchange({ action: "shift-close", shiftId, overwrite });
+      if (result?.data?.code === "CHECKOUTS_PENDING") {
+        setCloseShiftWarning(result.data.pending || []);
+        return false;
+      }
+      if (!result?.ok || !result.data?.ok) {
+        toastH.toast_(result?.error || "Shift gagal ditutup di server presensi.", "err");
+        return false;
+      }
+    }
+    setCloseShiftWarning([]);
+    await authH.confirmCloseShift({ clearCart: cartH.clearCart });
+    return true;
+  }, [authH.activeShift, authH.confirmCloseShift, cartH.clearCart, toastH.toast_]);
 
   // loadBillToCart (wrapped) — selain mengisi cart, juga memulihkan pelanggan
   // yang tersimpan di bill. useCart.loadBillToCart sengaja tetap "murni"
@@ -595,6 +633,7 @@ const executeConfirmDel = useCallback((restoreStock = false) => {
         setReceipt={setReceipt}
         menuH={menuH}
         confirmCloseShift={confirmCloseShift}
+        closeShiftWarning={closeShiftWarning}
         openingCashModal={openingCashModal}
         openingCashInput={openingCashInput}
         setOpeningCashInput={setOpeningCashInput}

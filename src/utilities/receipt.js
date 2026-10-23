@@ -151,7 +151,7 @@ function buildReceiptHTML(trx, logo, receiptAdditionals, qrisImages, warungName,
   const pajak = trx.pajak || 0;
   const service = trx.service || 0;
   const discount = trx.discount || 0;
-  const total = trx.total || trx.subtotal;
+  const total = trx.total ?? trx.subtotal;
   // Use stored label from transaction, fallback to lookup, NEVER show raw key
   const metodeLabel = trx.metodeBayarLabel 
     ?? paymentMethods.find(m => m.key === trx.metodeBayar)?.label 
