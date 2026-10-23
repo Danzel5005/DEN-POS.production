@@ -32,8 +32,8 @@ function useReceiptPrinting({ settingsH, menuH, cartH, toast_ }) {
     const printerName = settingsH.settings.printerName || "";
     const selection = getPrinterSelectionStatus(printerName);
 
-    if (selection.isThermal) {
-      const res = await window.api.printReceiptEscPos({
+    if (selection.isThermal || window.kasirAndroid?.printReceiptEscPos) {
+      const printData = {
         trx,
         printerName,
         paperWidthMm: settingsH.settings.receiptPaperWidthMm,
@@ -44,7 +44,14 @@ function useReceiptPrinting({ settingsH, menuH, cartH, toast_ }) {
         cats: menuH.cats,
         customerEnabled: settingsH.settings.customerEnabled !== false,
         receiptAdditionals: settingsH.settings.receiptAdditionals,
-      });
+        receiptHeaderText: settingsH.settings.receiptHeaderText,
+        receiptFooterText: settingsH.settings.receiptFooterText,
+      };
+      const res = window.kasirAndroid?.printReceiptEscPos
+        ? JSON.parse(window.kasirAndroid.printReceiptEscPos(JSON.stringify(printData)))
+        : window.kasirAPI?.printReceiptEscPos
+          ? await window.kasirAPI.printReceiptEscPos(printData)
+          : { ok: false, error: "Cetak thermal hanya tersedia di aplikasi dengan dukungan printer Bluetooth" };
       if (res?.ok) toast_("Selesai Mencetak Resi", "ok");
       else toast_(res?.error || "Gagal cetak thermal", "err");
       return res;

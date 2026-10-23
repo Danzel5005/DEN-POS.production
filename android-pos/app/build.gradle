@@ -1,0 +1,51 @@
+plugins {
+    id 'com.android.application'
+    id 'org.jetbrains.kotlin.android'
+}
+
+def webAssets = layout.buildDirectory.dir("generated/assets/www")
+
+android {
+    namespace 'com.denpos.mobile'
+    compileSdk 34
+
+    defaultConfig {
+        applicationId "com.denpos.mobile"
+        minSdk 24
+        targetSdk 34
+        versionCode 1
+        versionName "1.4.0"
+    }
+
+    sourceSets {
+        main.assets.srcDir(layout.buildDirectory.dir("generated/assets"))
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_1_8
+        targetCompatibility JavaVersion.VERSION_1_8
+    }
+
+    kotlinOptions {
+        jvmTarget = '1.8'
+    }
+}
+
+tasks.register('buildWebApp', Exec) {
+    workingDir rootProject.projectDir.parentFile
+    commandLine 'cmd', '/c', 'npm run build'
+}
+
+tasks.register('copyWebAssets', Sync) {
+    dependsOn 'buildWebApp'
+    from(rootProject.projectDir.parentFile.toPath().resolve('dist').toFile())
+    into(webAssets)
+}
+
+tasks.named('preBuild').configure {
+    dependsOn 'copyWebAssets'
+}
+
+dependencies {
+    implementation 'androidx.webkit:webkit:1.11.0'
+}
