@@ -219,8 +219,14 @@ function useHistory({ toast_, addUndo, getNow, authH, applyBahanUsage = null }) 
   const doCSV = useCallback(async (filename, content) => {
     const t = getNow();
     const fn = `${filename}_${t.tgl}-${t.blnNum}-${t.thn}.csv`;
-    const res = await api.saveCSV({ filename: fn, content });
-    if (res?.ok) toast_(`${filename} disimpan`, "ok"); else toast_("Dibatalkan", "err");
+    try {
+      const res = await api.saveCSV({ filename: fn, content });
+      const path = res?.path || res?.filePath;
+      if (res?.ok) toast_(path ? `${filename} disimpan: ${path}` : `${filename} disimpan`, "ok", path ? 8000 : 3000);
+      else toast_(res?.error || "Unduhan CSV dibatalkan", "err");
+    } catch (error) {
+      toast_(error?.message || "Gagal menyimpan CSV", "err");
+    }
   }, [getNow, toast_]);
 
   // Load all for export (fetch all pages)

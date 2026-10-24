@@ -328,8 +328,11 @@ async deleteTrx(id, opts) {
   async getDataPath()     { return window.kasirAPI ? await window.kasirAPI.getDataPath()      : "localStorage"; },
   async saveCSV(data)     {
     if(window.kasirAPI) return window.kasirAPI.saveCSV(data);
+    if(window.kasirAndroid?.saveCSV) return JSON.parse(window.kasirAndroid.saveCSV(data.filename, data.content));
     const blob=new Blob(["\uFEFF"+data.content],{type:"text/csv;charset=utf-8;"}); const url=URL.createObjectURL(blob);
-    const a=document.createElement("a"); a.href=url; a.download=data.filename; a.click(); URL.revokeObjectURL(url); return {ok:true};
+    const a=document.createElement("a"); a.href=url; a.download=data.filename; a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    return {ok:true,path:`Unduhan browser/${data.filename}`};
   },
   // Backup & Restore — hanya tersedia di aplikasi desktop (butuh akses folder data)
   isDesktop()             { return !!window.kasirAPI; },

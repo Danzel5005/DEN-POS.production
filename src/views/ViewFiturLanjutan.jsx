@@ -23,7 +23,7 @@ function ViewFiturLanjutan({ menu, cats, advancedData, settings, toast_, addUndo
   return (
     <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
       {/* Header halaman */}
-      <div style={{ padding: "9px 16px", background: W, borderBottom: `1px solid ${BD}`, flexShrink: 0 }}>
+      <div className="page-toolbar" style={{ padding: "9px 16px", background: W, borderBottom: `1px solid ${BD}`, flexShrink: 0 }}>
         <div style={{ fontSize: TYPOGRAPHY.body.fontSize, fontWeight: 700, color: G }}>Fitur Tingkat Lanjut</div>
         <div style={{ fontSize: TYPOGRAPHY.label.fontSize, color: MT, marginTop: 2 }}>
           Bahan baku, supplier, resep &amp; HPP, loyalty tier, dan impor Excel.

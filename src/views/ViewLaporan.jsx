@@ -269,7 +269,7 @@ const rev=shiftTrx.reduce((s,t)=>s+paidOf(t),0);
 
   return (
     <div style={{flex:1,overflowY:"auto",padding:"16px 20px"}}>
-      <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:10,marginBottom:12}}>
+      <div className="page-toolbar" style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:10,marginBottom:12}}>
         <div>
           <div style={{fontSize:14,fontWeight:700,color:G,marginBottom:3}}>Laporan Keuangan & Penjualan</div>
           <div style={{fontSize:11,color:MT}}>CSV diunduh terpisah per hari. Isi harga modal di Kelola Menu untuk laporan laba/rugi.</div>

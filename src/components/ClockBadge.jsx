@@ -23,8 +23,8 @@ function ClockBadge() {
   }, []);
   return (
     <>
-      <div style={{fontSize:TYPOGRAPHY.label.fontSize,color:MT,padding:"4px 8px",background:LT,borderRadius:RADIUS.sm,border:`1px solid ${BD}`}}>{now.hari}, {now.tgl} {now.bln}</div>
-      <div style={{fontSize:TYPOGRAPHY.label.fontSize,color:MT,padding:"4px 8px",background:LT,borderRadius:RADIUS.sm,border:`1px solid ${BD}`}}>{now.jam}:{now.mnt} WIB</div>
+      <div className="workspace-date" style={{fontSize:TYPOGRAPHY.label.fontSize,color:MT,padding:"4px 8px",background:LT,borderRadius:RADIUS.sm,border:`1px solid ${BD}`}}>{now.hari}, {now.tgl} {now.bln}</div>
+      <div className="workspace-time" style={{fontSize:TYPOGRAPHY.label.fontSize,color:MT,padding:"4px 8px",background:LT,borderRadius:RADIUS.sm,border:`1px solid ${BD}`}}>{now.jam}:{now.mnt} WIB</div>
     </>
   );
 }

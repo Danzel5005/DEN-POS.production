@@ -42,6 +42,21 @@ tasks.register('copyWebAssets', Sync) {
     into(webAssets)
 }
 
+// App icon — salin PNG dari folder DenPosIcons (sumber ikon bersama dengan web)
+// ke res mipmap, jadi launcher memakai logo DEN POS tanpa duplikasi file.
+def iconSizes = ["mipmap-mdpi": 48, "mipmap-hdpi": 72, "mipmap-xhdpi": 96, "mipmap-xxhdpi": 144, "mipmap-xxxhdpi": 192]
+iconSizes.each { resName, size ->
+    def target = file("src/main/res/${resName}")
+    tasks.register("copyIcon${resName}", Copy) {
+        from(rootProject.projectDir.parentFile.toPath().resolve('DenPosIcons').resolve("android-chrome-${size}x${size}.png"))
+        into(target)
+        rename { 'ic_launcher.png' }
+    }
+}
+tasks.matching { it.name.startsWith('copyIcon') }.configureEach {
+    tasks.named('preBuild').configure { dependsOn it }
+}
+
 tasks.named('preBuild').configure {
     dependsOn 'copyWebAssets'
 }

@@ -139,6 +139,15 @@ function KasirWorkspace() {
     if (view === "fitur-lanjutan" && !settingsH.settings.advancedFeatures?.enabled) setView("menu");
   }, [authH.currentUser, view]);
 
+  useEffect(() => {
+    const openSettings = () => {
+      if (isAdmin(authH.currentUser)) settingsH.setSettingsModal(true);
+      else toastH.toast_("Pengaturan hanya tersedia untuk admin", "err");
+    };
+    window.addEventListener("denpos-open-settings", openSettings);
+    return () => window.removeEventListener("denpos-open-settings", openSettings);
+  }, [authH.currentUser, settingsH.setSettingsModal, toastH.toast_]);
+
   // ── Loyalty Tier → Diskon otomatis (Fase 1).
   // Basis tier bisa dipilih di Settings:
   //   - "transaction" (default): TOTAL TRANSAKSI SAAT INI (subtotal keranjang)
@@ -596,6 +605,7 @@ const executeConfirmDel = useCallback((restoreStock = false) => {
               advancedFeatures={settingsH.settings.advancedFeatures} isAdvancedActive={settingsH.isAdvancedActive}
               advancedData={advDataH}
               toast_={toastH.toast_}
+              onImported={menuH.refreshFromStore}
             />
         )}
 

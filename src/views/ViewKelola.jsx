@@ -9,6 +9,7 @@ import OpnameModal from "../components/modals/OpnameModal.jsx";
 import { csvRestock } from "../utilities/csvbuild.js";
 import { api } from "../utilities/utils.js";
 import { DEFAULT_LOW_STOCK_THRESHOLD } from "../utilities/stock.js";
+import ImportExcelPanel from "../components/advanced/ImportExcelPanel.jsx";
 
 // ViewKelola — kelola menu, kategori (CRUD).
 function ViewKelola({
@@ -21,6 +22,7 @@ function ViewKelola({
 advancedFeatures,
 advancedData = null,
 toast_ = null,                        // optional feedback hook
+onImported,
 }) {
   const [stockInItem, setStockInItem] = useState(null);
   const [opnameOpen, setOpnameOpen] = useState(false);
@@ -79,15 +81,16 @@ toast_ = null,                        // optional feedback hook
     api.saveCSV({ filename, content: csvRestock(restockRows, now) })
       .then((res) => {
         if (!toast_) return;
-        if (res?.ok) toast_("Daftar Restock disimpan", "ok");
-        else if (res !== undefined) toast_("Dibatalkan", "err");
+        const path = res?.path || res?.filePath;
+        if (res?.ok) toast_(path ? `Daftar Restock disimpan: ${path}` : "Daftar Restock disimpan", "ok", path ? 8000 : 3000);
+        else if (res !== undefined) toast_(res?.error || "Unduhan CSV dibatalkan", "err");
       })
       .catch(() => { if (toast_) toast_("Gagal menyimpan CSV", "err"); });
   };
 
   return (
     <div style={{flex:1,display:"flex",flexDirection:"column",overflow:"hidden"}}>
-      <div style={{padding:"9px 16px",background:W,borderBottom:`1px solid ${BD}`,...row,flexShrink:0}}>
+      <div className="page-toolbar" style={{padding:"9px 16px",background:W,borderBottom:`1px solid ${BD}`,...row,flexShrink:0}}>
         <div>
           <div style={{fontSize:TYPOGRAPHY.body.fontSize,fontWeight:700,color:G}}>Kelola Menu & Kategori</div>
           <div style={{fontSize:TYPOGRAPHY.label.fontSize,color:MT}}>{menu.length} item · {cats.length} kategori</div>
@@ -115,6 +118,10 @@ toast_ = null,                        // optional feedback hook
         </div>
       </div>
 <div style={{flex:1,overflowY:"auto",padding:"10px 16px"}}>
+      <details style={{marginBottom:12}}>
+        <summary style={{cursor:"pointer",fontSize:12,fontWeight:700,color:G,padding:"8px 0"}}>Import menu dari Excel</summary>
+        <ImportExcelPanel menu={menu} cats={cats} advancedData={advancedData} toast_={toast_} onImported={onImported} />
+      </details>
       {menu.length > 0 && (
         <div style={{padding:"10px 16px 0",flexShrink:0}}>
           <StockAlertPanel

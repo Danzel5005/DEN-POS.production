@@ -23,3 +23,24 @@ export function getPrinterSelectionStatus(name = "") {
 
   return { isPdf: false, isThermal: false, fallbackMode: "system", name: value };
 }
+
+// isAndroidPrint — true saat berjalan di WebView Android dengan bridge kasirAndroid.
+export function isAndroidPrint() {
+  return typeof window !== "undefined" && !!window.kasirAndroid;
+}
+
+export function getAndroidPrintMode() {
+  try { return window.kasirAndroid?.getPrintMode?.() || "bluetooth"; } catch { return "bluetooth"; }
+}
+
+// androidPrintReceipt — kirim resi ke bridge Android. Saat mode PDF aktif,
+// teruskan HTML final ke WebView cetak native.
+export async function androidPrintReceipt(printData, buildHTML) {
+  let res;
+  try { res = JSON.parse(window.kasirAndroid.printReceiptEscPos(JSON.stringify(printData))); }
+  catch (err) { return { ok: false, error: String(err?.message || err) }; }
+  if (res?.ok) return res;
+  if (!res?.usePdf) return res;
+  try { return JSON.parse(window.kasirAndroid.printReceiptPdf(buildHTML())); }
+  catch (err) { return { ok: false, error: String(err?.message || err) }; }
+}

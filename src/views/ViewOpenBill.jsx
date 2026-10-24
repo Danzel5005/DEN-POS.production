@@ -60,7 +60,7 @@ function ViewOpenBill({
   return (
     <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden", background: W }}>
       {/* Header */}
-      <div style={{
+      <div className="page-toolbar" style={{
         padding: `${SPACING.md} ${SPACING.lg}`,
         background: W,
         borderBottom: `1px solid ${BD}`,
@@ -314,5 +314,4 @@ function ViewOpenBill({
 }
 
 export default memo(ViewOpenBill);
-
 

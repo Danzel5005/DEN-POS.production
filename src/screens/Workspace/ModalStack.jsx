@@ -178,7 +178,7 @@ export default function ModalStack({
 
       {/* ── TOAST ────────────────────────────────────────────────────────── */}
       {toastH.toast&&(
-        <div style={{position:"fixed",bottom:toastH.undoBuf?95:50,left:"50%",transform:"translateX(-50%)",background:toastH.toast.type==="ok"?"#e8f5ee":"#fef0f0",border:`1px solid ${toastH.toast.type==="ok"?"#a8d5b8":"#f5a8a8"}`,color:toastH.toast.type==="ok"?G:"#e84040",padding:"8px 16px",borderRadius:8,fontSize:11,fontWeight:600,zIndex:400,boxShadow:"0 4px 14px rgba(0,0,0,0.1)",whiteSpace:"nowrap"}}>
+        <div style={{position:"fixed",bottom:toastH.undoBuf?95:50,left:"50%",transform:"translateX(-50%)",background:toastH.toast.type==="ok"?"#e8f5ee":"#fef0f0",border:`1px solid ${toastH.toast.type==="ok"?"#a8d5b8":"#f5a8a8"}`,color:toastH.toast.type==="ok"?G:"#e84040",padding:"8px 16px",borderRadius:8,fontSize:11,fontWeight:600,zIndex:400,boxShadow:"0 4px 14px rgba(0,0,0,0.1)",maxWidth:"min(90vw, 640px)",whiteSpace:"normal",overflowWrap:"anywhere",textAlign:"center"}}>
           {toastH.toast.msg}
         </div>
       )}

@@ -72,7 +72,7 @@ function ViewKasir({
     <>
       <style>{"@keyframes preview-shimmer{from{transform:translateX(-100%)}to{transform:translateX(100%)}}"}</style>
       {/* Sidebar kategori */}
-      <aside style={{width:146,background:G,display:"flex",flexDirection:"column",flexShrink:0,overflowY:"auto"}}>
+      <aside className="kasir-categories" style={{width:146,background:G,display:"flex",flexDirection:"column",flexShrink:0,overflowY:"auto"}}>
         {allCats.map(k=>(
           <button key={k.key} onClick={()=>setKategori(k.key)} style={{display:"flex",alignItems:"center",padding:"10px 13px",border:"none",cursor:"pointer",fontFamily:"inherit",fontSize:11,fontWeight:600,textAlign:"left",background:kategori===k.key?"rgba(255,255,255,0.18)":"transparent",color:W,borderLeft:kategori===k.key?"3px solid #fff":"3px solid transparent",transition:"all 0.15s"}}>
             {k.label}
@@ -124,7 +124,7 @@ function ViewKasir({
       {drawerOpen&&<div onClick={()=>setDrawerOpen(false)} style={{position:"absolute",inset:0,zIndex:90,background:"rgba(0,0,0,0.3)"}}/>}
 
       {/* ─ Cart Drawer ─ */}
-      <div style={{position:"absolute",top:0,right:0,bottom:0,zIndex:95,width:340,background:W,borderLeft:`1px solid ${BD}`,display:"flex",flexDirection:"column",transform:drawerOpen?"translateX(0)":"translateX(100%)",transition:"transform 0.3s cubic-bezier(.4,0,.2,1)",boxShadow:drawerOpen?"-5px 0 20px rgba(0,0,0,0.1)":"none"}}>
+      <div className="cart-drawer" style={{position:"absolute",top:0,right:0,bottom:0,zIndex:95,width:340,background:W,borderLeft:`1px solid ${BD}`,display:"flex",flexDirection:"column",transform:drawerOpen?"translateX(0)":"translateX(100%)",transition:"transform 0.3s cubic-bezier(.4,0,.2,1)",boxShadow:drawerOpen?"-5px 0 20px rgba(0,0,0,0.1)":"none"}}>
         <div style={{background:G,padding:"10px 13px",...row}}>
           <div>
             <span style={{color:W,fontWeight:700,fontSize:13}}>Pesanan</span>
@@ -147,7 +147,7 @@ function ViewKasir({
         )}
 
         {/* Order details stay in the cart drawer so they are saved with open bills. */}
-        {drawerOpen && <div style={{padding:"8px 12px",borderBottom:`1px solid ${BD}`,background:"#f9faf9"}}>
+        {drawerOpen && <div className="cart-details" style={{padding:"8px 12px",borderBottom:`1px solid ${BD}`,background:"#f9faf9"}}>
           {customerEnabled && customerPicker}
           {(paxEnabled || tableEnabled) && <div style={{display:"grid",gridTemplateColumns:paxEnabled&&tableEnabled?"1fr 1fr":"1fr",gap:7,marginBottom:7}}>
             {tableEnabled && <label style={{fontSize:10,color:MT,fontWeight:600}}>Table<input aria-label="Table" type="text" value={tableNumber} onChange={e=>setTableNumber(e.target.value)} placeholder="Nomor meja" style={{...inp,fontSize:12,marginTop:3}} /></label>}
@@ -192,7 +192,7 @@ function ViewKasir({
         </div>}
 
         {/* Items */}
-        <div style={{flex:1,overflowY:"auto"}}>
+        <div className="cart-items" style={{flex:1,overflowY:"auto"}}>
           {items.length===0?<div style={{textAlign:"center",color:MT,marginTop:50,fontSize:12}}><div style={{fontSize:32,marginBottom:6}}>&#128722;</div>Belum ada pesanan</div>
           :items.map((item,idx)=>{
             const cartKey = item.cartKey || item.id;

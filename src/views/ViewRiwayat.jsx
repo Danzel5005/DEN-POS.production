@@ -88,6 +88,7 @@ function ViewRiwayat({
     const metodeLabel = t.metodeBayarLabel ?? paymentMethods.find(m => m.key === t.metodeBayar)?.label ?? METODE_LABELS[t.metodeBayar] ?? String(t.metodeBayar || "-").replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
     return (
       <div key={t.id} onClick={() => setReceipt(t)}
+        className="history-transaction"
         style={{ background:isVoid ? "#fafafa" : W, border:`1px solid ${isVoid ? "#e0d0d0" : BD}`, borderRadius:8, padding:"9px 12px", marginBottom:5, cursor:"pointer", transition:"border 0.15s", opacity:isVoid ? 0.75 : 1 }}
         onMouseEnter={e => e.currentTarget.style.borderColor=isVoid ? "#d8b8b8" : "#a8d5b8"}
         onMouseLeave={e => e.currentTarget.style.borderColor=isVoid ? "#e0d0d0" : BD}
@@ -157,7 +158,7 @@ function ViewRiwayat({
   return (
     <div style={{ flex:1, display:"flex", flexDirection:"column", overflow:"hidden" }}>
       {/* ── Filter bar ── */}
-      <div style={{ padding:"8px 16px", background:W, borderBottom:`1px solid ${BD}`, display:"flex", gap:8, alignItems:"center", flexWrap:"wrap", flexShrink:0 }}>
+      <div className="page-toolbar history-toolbar" style={{ padding:"8px 16px", background:W, borderBottom:`1px solid ${BD}`, display:"flex", gap:8, alignItems:"center", flexWrap:"wrap", flexShrink:0 }}>
         <div style={{ fontWeight:700, fontSize:12, color:G }}>Riwayat Transaksi</div>
 
         {/* Toggle view mode */}
@@ -206,7 +207,7 @@ function ViewRiwayat({
               borderRadius:5, cursor:totalCount ? "pointer" : "not-allowed",
               fontFamily:"inherit", fontSize:10, fontWeight:600 }}>Hapus Semua</button>}
         </div>
-        <div style={{ width:"100%", fontSize:10, color:MT }}>
+        <div className="history-summary" style={{ width:"100%", fontSize:10, color:MT }}>
           {totalCount} transaksi total · Menampilkan halaman {currentPage + 1} ({history.length} item) · Total: <b style={{ color:G }}>{fmt(history.reduce((s,t) => s + t.total, 0))}</b>
           {' · '}{history.reduce((s,t) => s + (t.pax||0), 0)} pax halaman ini
         </div>
@@ -332,4 +333,3 @@ function ViewRiwayat({
 }
 
 export default memo(ViewRiwayat);
-

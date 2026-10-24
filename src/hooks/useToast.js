@@ -9,11 +9,13 @@ function useToast() {
   // undo buffer: {label, restore: async fn}
   const [undoBuf, setUndoBuf] = useState(null);
   const undoTimer = useRef(null);
+  const toastTimer = useRef(null);
 
   // deps kosong aman: hanya pakai setState (stabil by React) dan setTimeout.
-  const toast_ = useCallback((msg, type = "ok") => {
+  const toast_ = useCallback((msg, type = "ok", duration = 3000) => {
+    if (toastTimer.current) clearTimeout(toastTimer.current);
     setToast({ msg, type });
-    setTimeout(() => setToast(null), 3000);
+    toastTimer.current = setTimeout(() => setToast(null), duration);
   }, []);
 
   // deps kosong aman: hanya pakai undoTimer (ref, stabil) dan setState.

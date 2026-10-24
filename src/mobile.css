@@ -74,6 +74,22 @@ textarea {
     overflow-y: hidden !important;
   }
 
+  .kasir-categories {
+    width: 116px !important;
+    max-height: none;
+    flex-direction: column !important;
+    overflow-x: hidden !important;
+    overflow-y: auto !important;
+    overscroll-behavior: contain;
+  }
+
+  .kasir-categories button {
+    flex: 0 0 auto;
+    justify-content: flex-start;
+    min-height: 42px;
+    text-align: left;
+  }
+
   aside button {
     flex: 0 0 auto;
     min-height: 44px;
@@ -101,6 +117,32 @@ textarea {
 }
 
 @media (max-width: 600px) {
+  .page-toolbar {
+    gap: 8px !important;
+    padding: 8px 10px !important;
+  }
+
+  .page-toolbar > div {
+    min-width: 0;
+  }
+
+  .page-toolbar > div:last-child {
+    flex: 1 1 100%;
+    flex-wrap: wrap;
+    justify-content: flex-start !important;
+    margin-left: 0 !important;
+  }
+
+  .page-toolbar > div:last-child > * {
+    flex: 1 1 auto;
+    max-width: 100%;
+  }
+
+  .page-toolbar > div:last-child > div:first-child {
+    min-width: 0 !important;
+    flex-basis: 160px;
+  }
+
   header > div:nth-of-type(2) {
     min-width: 0;
   }
@@ -123,5 +165,228 @@ textarea {
 
   footer > span:nth-child(2) {
     display: none;
+  }
+
+  header > div:nth-of-type(1) {
+    display: none;
+  }
+}
+
+@media (max-width: 900px) {
+  .settings-modal-tabs {
+    width: 110px !important;
+    min-width: 110px !important;
+    max-height: none !important;
+    flex-direction: column !important;
+    overflow-x: hidden !important;
+    overflow-y: auto !important;
+  }
+}
+
+button,
+a,
+input,
+select,
+textarea {
+  transition: color 160ms ease, background-color 160ms ease, border-color 160ms ease, box-shadow 160ms ease;
+}
+
+:focus-visible {
+  outline: 2px solid #e87c2a;
+  outline-offset: 2px;
+}
+
+@media (max-height: 520px) and (orientation: landscape) {
+  header {
+    min-height: 40px !important;
+    padding-top: 3px !important;
+    padding-bottom: 3px !important;
+  }
+
+  header > div:nth-of-type(3) button,
+  header > div:nth-of-type(4) > * {
+    min-height: 34px;
+  }
+
+  footer {
+    min-height: 26px;
+  }
+
+  #root main > div {
+    min-height: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+@media (orientation: landscape) and (max-height: 600px) {
+  header {
+    height: 42px !important;
+    min-height: 42px !important;
+    flex-wrap: nowrap !important;
+    gap: 5px !important;
+    padding: 2px 8px !important;
+    overflow: hidden;
+  }
+
+  .workspace-logo,
+  .workspace-brand {
+    display: flex !important;
+    flex: 0 0 auto !important;
+  }
+
+  .workspace-nav {
+    order: 0 !important;
+    flex: 1 1 auto !important;
+    min-width: 0;
+    margin: 0 2px !important;
+    overflow-x: auto !important;
+    scrollbar-width: none;
+  }
+
+  .workspace-nav::-webkit-scrollbar,
+  .workspace-actions::-webkit-scrollbar {
+    display: none;
+  }
+
+  .workspace-nav button {
+    min-height: 32px !important;
+    flex: 0 0 auto;
+    padding: 3px 7px !important;
+    font-size: 9px !important;
+    white-space: nowrap;
+  }
+
+  .workspace-actions {
+    order: 0 !important;
+    flex: 0 0 auto !important;
+    min-width: 0;
+    margin-left: 0 !important;
+    overflow-x: auto !important;
+    scrollbar-width: none;
+  }
+
+  .workspace-actions > * {
+    min-height: 30px !important;
+    flex: 0 0 auto;
+    padding: 3px 6px !important;
+    font-size: 9px !important;
+  }
+
+  .workspace-shift,
+  .workspace-date {
+    display: none !important;
+  }
+
+  .page-toolbar {
+    padding: 4px 8px !important;
+    gap: 5px !important;
+  }
+
+  .history-toolbar {
+    flex-wrap: nowrap !important;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+
+  .history-toolbar > div {
+    flex: 0 0 auto;
+    width: auto !important;
+    margin: 0 !important;
+    flex-wrap: nowrap !important;
+  }
+
+  .history-toolbar .history-summary {
+    display: none;
+  }
+
+  .history-transaction {
+    padding: 4px 8px !important;
+    margin-bottom: 3px !important;
+  }
+
+  .history-transaction > div {
+    margin-bottom: 2px !important;
+  }
+
+  .history-transaction > div:nth-of-type(2) {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    margin-bottom: 1px !important;
+  }
+
+  .history-transaction > div:first-child > div:last-child > span {
+    display: none;
+  }
+
+  .cart-drawer {
+    width: min(420px, 52vw) !important;
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  .cart-drawer > .cart-details {
+    max-height: 27%;
+    overflow-y: auto;
+    flex: 0 1 auto;
+    min-height: 0;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .cart-drawer > .cart-items {
+    flex: 1 1 0 !important;
+    min-height: 0;
+    overflow-y: auto !important;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .settings-modal-panel {
+    padding: 12px !important;
+  }
+
+  .settings-modal-tabs {
+    width: 120px !important;
+    min-width: 120px !important;
+    max-height: none !important;
+    flex-direction: column !important;
+    overflow-x: hidden !important;
+    overflow-y: auto !important;
+  }
+}
+
+@media (max-width: 600px) {
+  .settings-modal-panel {
+    padding: 10px !important;
+  }
+
+  .settings-modal-tabs {
+    width: 94px !important;
+    min-width: 94px !important;
+    max-height: none !important;
+    flex-direction: column !important;
+    overflow-x: hidden !important;
+    overflow-y: auto !important;
+  }
+
+  .settings-modal-tabs button {
+    min-height: 36px !important;
+    padding: 7px 6px !important;
+    font-size: 9px !important;
+    white-space: normal;
+  }
+
+  .settings-modal-content {
+    padding: 8px !important;
   }
 }
