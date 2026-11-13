@@ -12,6 +12,7 @@ import { G, OR, W, LT, TX, BD, MT } from "../../constants/design.js";
 export default function ModalStack({
   payModal,
   cartH,
+  customer,
   processPayment,
   setPayModal,
   settingsH,
@@ -47,7 +48,7 @@ export default function ModalStack({
     <>
       {/* ══ MODAL: PEMBAYARAN ══════════════════════════════════════════════ */}
       {payModal && (
-        <PayModal cartH={cartH} processPayment={processPayment} setPayModal={setPayModal} paymentMethods={settingsH.settings.paymentMethods} receiptAdditionals={settingsH.settings.receiptAdditionals} paxEnabled={settingsH.settings.receiptPaxEnabled} tableEnabled={settingsH.settings.receiptTableEnabled} />
+        <PayModal cartH={cartH} processPayment={processPayment} setPayModal={setPayModal} paymentMethods={settingsH.settings.paymentMethods} receiptAdditionals={settingsH.settings.receiptAdditionals} paxEnabled={settingsH.settings.receiptPaxEnabled} tableEnabled={settingsH.settings.receiptTableEnabled} customer={customer} customerEnabled={settingsH.settings.customerEnabled !== false} />
         )}
 
         {/* VOID MODAL */}
@@ -66,7 +67,7 @@ export default function ModalStack({
 
       {/* ══ MODAL: RESI (klik transaksi atau setelah bayar) ════════════════ */}
       {receipt && (
-        <ReceiptModal receipt={receipt} logo={settingsH.logo} printReceipt={printReceipt} setReceipt={setReceipt} receiptAdditionals={settingsH.settings.receiptAdditionals} qrisImages={settingsH.settings.qrisImages} paymentMethods={settingsH.settings.paymentMethods} />
+        <ReceiptModal receipt={receipt} logo={settingsH.logo} printReceipt={printReceipt} setReceipt={setReceipt} receiptAdditionals={settingsH.settings.receiptAdditionals} qrisImages={settingsH.settings.qrisImages} paymentMethods={settingsH.settings.paymentMethods} customerEnabled={settingsH.settings.customerEnabled !== false} paxEnabled={settingsH.settings.receiptPaxEnabled === true} tableEnabled={settingsH.settings.receiptTableEnabled === true} />
       )}
 
       {/* ══ MODAL: TAMBAH/EDIT MENU ════════════════════════════════════════ */}

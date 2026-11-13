@@ -10,6 +10,7 @@ import ModalStack from "./screens/Workspace/ModalStack.jsx";
 import RestockInbox from "./components/RestockInbox.jsx";
 
 import { useToast } from "./hooks/useToast.js";
+import { syncShiftAttendance } from "./utilities/shiftAttendance.js";
 import { useSettings } from "./hooks/useSettings.js";
 import { useLicense } from "./hooks/useLicense.js";
 import { useAuth } from "./hooks/useAuth.js";
@@ -224,28 +225,25 @@ function KasirWorkspace() {
     if (!authH.loginForm.username || !authH.loginForm.password || showSnakeLoader) return;
 
     const ok = await authH.doLogin(async (shift) => {
-      const status = await api.deviceStatus();
-      if (!status?.identity?.registered) return shift;
-      let position;
-      try {
-        position = await new Promise((resolve, reject) => {
+      if (!settingsH.isAdvancedActive("attendance")) return shift;
+      const attendance = await syncShiftAttendance(shift, {
+        getDeviceStatus: () => api.deviceStatus(),
+        getPosition: () => new Promise((resolve, reject) => {
           if (!navigator.geolocation) { reject(new Error("GPS tidak tersedia")); return; }
           navigator.geolocation.getCurrentPosition(resolve, reject, { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 });
-        });
-      } catch (error) {
-        const reason = error?.code === 1 ? "Izin lokasi ditolak. Aktifkan izin lokasi DEN POS di pengaturan Windows, lalu coba lagi." : "Lokasi tidak ditemukan. Aktifkan Layanan Lokasi/GPS, matikan mode pesawat, dan coba di area terbuka.";
-        toastH.toast_(reason, "err");
-        return null;
+        }),
+        exchange: (payload) => api.deviceAttendanceExchange(payload),
+      });
+      if (attendance.error) {
+        const error = attendance.error;
+        const reason = error?.code === 1
+          ? "izin lokasi ditolak"
+          : error?.code === 3
+            ? "permintaan lokasi melewati batas waktu"
+            : error?.message || "lokasi atau server tidak tersedia";
+        toastH.toast_(`Shift tetap dimulai, tetapi presensi Web-App tidak tercatat: ${reason}.`, "err");
       }
-      const result = await api.deviceAttendanceExchange({ action: "shift-open", shift: {
-        id: shift.id, shiftNum: shift.shiftNum, operator: shift.operator, openedAt: shift.startTime,
-        latitude: position.coords.latitude, longitude: position.coords.longitude, accuracy: position.coords.accuracy,
-      } });
-      if (!result?.ok) {
-        toastH.toast_(result?.error || "Lokasi shift gagal disinkronkan. Periksa koneksi internet.", "err");
-        return null;
-      }
-      return { ...shift, attendanceShiftId: result.data?.shiftId, attendanceRadiusM: result.data?.radiusM };
+      return attendance.shift;
     });
     if (!ok) return;
 
@@ -256,7 +254,7 @@ function KasirWorkspace() {
     setShowSnakeLoader(false);
     setLoginTransitioning(false);
     setOpeningCashModal(true);
-  }, [authH, showSnakeLoader, toastH.toast_])
+  }, [authH, showSnakeLoader, toastH.toast_, settingsH.isAdvancedActive])
 
   // ── Receipt & Pay modal — UI state yang menjembatani cart+history, tetap di App.jsx
   const [payModal, setPayModal] = useState(false);
@@ -332,14 +330,43 @@ function KasirWorkspace() {
   // baru tiap render App.jsx, dan memo di child jadi tidak efektif.
 
   // saveOpenBill butuh bills/billId/persistBills dari useBills (parameter, bukan import)
-  const saveOpenBill = useCallback(() => cartH.saveOpenBill({
-    bills: billsH.bills, billId: billsH.billId,
-    persistBills: billsH.persistBills, setBillId: billsH.setBillId,
-    applyStockView: menuH.applyStockView, // Langkah 2: patch view dari { stock } IPC
-    customer: customersH.selectedCustomer, // denormalized into the open bill
-    paxEnabled: settingsH.settings.receiptPaxEnabled,
-    tableEnabled: settingsH.settings.receiptTableEnabled,
-  }), [cartH.saveOpenBill, billsH.bills, billsH.billId, billsH.persistBills, billsH.setBillId, menuH.applyStockView, customersH.selectedCustomer, settingsH.settings.receiptPaxEnabled, settingsH.settings.receiptTableEnabled]);
+  const saveOpenBill = useCallback(async () => {
+    const table = String(cartH.tableNumber || "").trim();
+    const duplicate = settingsH.settings.receiptTableEnabled === true && table
+      ? billsH.bills.find((bill) => String(bill.id) !== String(cartH.activeBill?.id)
+        && (bill.status === "open" || !bill.status)
+        && String(bill.tableNumber || "").trim().toLocaleLowerCase() === table.toLocaleLowerCase())
+      : null;
+    const options = {
+      bills: billsH.bills, billId: billsH.billId,
+      persistBills: billsH.persistBills, setBillId: billsH.setBillId,
+      applyStockView: menuH.applyStockView,
+      customer: customersH.selectedCustomer,
+      paxEnabled: settingsH.settings.receiptPaxEnabled,
+      tableEnabled: settingsH.settings.receiptTableEnabled,
+    };
+
+    if (duplicate) {
+      const addToExisting = window.confirm(`Nomor table ${table} sudah ada, apakah ingin menambahkan item ini pada nomor table tersebut?`);
+      if (addToExisting) {
+        const saved = await cartH.saveOpenBill({ ...options, mergeBillId: duplicate.id });
+        if (saved) {
+          customersH.setSelectedCustomerId(null);
+          cartH.setDrawerOpen(true);
+        }
+        return saved;
+      }
+
+      if (!window.confirm("Apakah ingin membuat openbill baru?")) return false;
+      cartH.setActiveBill(null);
+      cartH.setTableNumber("");
+      cartH.setDrawerOpen(true);
+      toastH.toast_("Nomor Table dikosongkan. Isi data keranjang lalu simpan Open Bill.", "ok");
+      return false;
+    }
+
+    return cartH.saveOpenBill(options);
+  }, [cartH.saveOpenBill, cartH.tableNumber, cartH.activeBill, cartH.setActiveBill, cartH.setTableNumber, cartH.setDrawerOpen, billsH.bills, billsH.billId, billsH.persistBills, billsH.setBillId, menuH.applyStockView, customersH.selectedCustomer, customersH.setSelectedCustomerId, settingsH.settings.receiptPaxEnabled, settingsH.settings.receiptTableEnabled, toastH.toast_]);
 
   // processPayment butuh potongan dari useHistory, useMenu, useAuth, useBills
   // FIX: Use cartH.activeBill?.id directly to avoid race condition with setTimeout
@@ -374,7 +401,7 @@ function KasirWorkspace() {
   // (hanya dihapus jika sudah dibayar via processPayment -> removeBillLocal)
   const confirmCloseShift = useCallback(async (overwrite = false) => {
     const shiftId = authH.activeShift?.attendanceShiftId;
-    if (shiftId) {
+    if (settingsH.isAdvancedActive("attendance") && shiftId) {
       const result = await api.deviceAttendanceExchange({ action: "shift-close", shiftId, overwrite });
       if (result?.data?.code === "CHECKOUTS_PENDING") {
         setCloseShiftWarning(result.data.pending || []);
@@ -388,7 +415,7 @@ function KasirWorkspace() {
     setCloseShiftWarning([]);
     await authH.confirmCloseShift({ clearCart: cartH.clearCart });
     return true;
-  }, [authH.activeShift, authH.confirmCloseShift, cartH.clearCart, toastH.toast_]);
+  }, [authH.activeShift, authH.confirmCloseShift, cartH.clearCart, toastH.toast_, settingsH.isAdvancedActive]);
 
   // loadBillToCart (wrapped) — selain mengisi cart, juga memulihkan pelanggan
   // yang tersimpan di bill. useCart.loadBillToCart sengaja tetap "murni"
@@ -589,7 +616,7 @@ const executeConfirmDel = useCallback((restoreStock = false) => {
             openingCash={openingCash}
             totalExpenses={totalExpenses}
             onOpenExpenseModal={() => setExpenseModal(true)}
-            onOpenCashModal={() => setOpeningCashModal(true)} advancedFeatures={settingsH.settings.advancedFeatures} isAdvancedActive={settingsH.isAdvancedActive} warungName={settingsH.settings.warungName} warungAddress={settingsH.settings.warungAddress} warungPhone={settingsH.settings.warungPhone} currentUser={authH.currentUser} toast_={toastH.toast_}
+            onOpenCashModal={() => setOpeningCashModal(true)} advancedFeatures={settingsH.settings.advancedFeatures} isAdvancedActive={settingsH.isAdvancedActive} receiptPaxEnabled={settingsH.settings.receiptPaxEnabled === true} warungName={settingsH.settings.warungName} warungAddress={settingsH.settings.warungAddress} warungPhone={settingsH.settings.warungPhone} currentUser={authH.currentUser} toast_={toastH.toast_}
               advancedData={advDataH} />
         )}
 
@@ -627,12 +654,13 @@ const executeConfirmDel = useCallback((restoreStock = false) => {
       <footer style={{background:W,borderTop:`1px solid ${BD}`,padding:"3px 16px",...row,flexShrink:0}}>
         <span style={{fontSize:9,color:MT}}>Terima kasih berkunjung ke <span style={{color:OR,fontWeight:600}}>{settingsH.settings.warungName || "Warung"}</span></span>
         {dataPath&&<span style={{fontSize:8,color:"#ccc",overflow:"hidden",textOverflow:"ellipsis",maxWidth:300}}>{dataPath}</span>}
-        <span style={{fontSize:9,color:MT}}>v3.0.0</span>
+        <span style={{fontSize:9,color:MT}}>v1.4.2</span>
       </footer>
 
       <ModalStack
         payModal={payModal}
         cartH={cartH}
+        customer={customersH.selectedCustomer}
         processPayment={processPayment}
         setPayModal={setPayModal}
         settingsH={settingsH}
@@ -643,7 +671,7 @@ const executeConfirmDel = useCallback((restoreStock = false) => {
         setReceipt={setReceipt}
         menuH={menuH}
         confirmCloseShift={confirmCloseShift}
-        closeShiftWarning={closeShiftWarning}
+        closeShiftWarning={settingsH.isAdvancedActive("attendance") ? closeShiftWarning : []}
         openingCashModal={openingCashModal}
         openingCashInput={openingCashInput}
         setOpeningCashInput={setOpeningCashInput}

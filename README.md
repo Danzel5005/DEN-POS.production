@@ -2,9 +2,9 @@
 
 Aplikasi Point of Sale (POS) desktop untuk warung dan usaha makanan/minuman. Aplikasi berjalan sebagai aplikasi Windows berbasis Electron dengan antarmuka React, menyimpan data transaksi secara lokal, dan mendukung pencetakan struk thermal maupun PDF.
 
-Dokumen ini mengikuti struktur dan perilaku kode yang ada di repository. Versi aplikasi saat ini adalah `1.3.0` untuk Windows 10 ke atas.
+Dokumen ini mengikuti struktur dan perilaku kode yang ada di repository. Versi aplikasi saat ini adalah `1.4.2` untuk Windows 10 ke atas.
 
-Selain fungsi kasir inti, aplikasi menyediakan sekumpulan fitur lanjutan yang dikelompokkan menjadi tiga grup — laporan tambahan, fitur pelanggan tambahan, serta bahan baku, supplier, dan harga — dan dapat dinyalakan secara terpisah dari Settings pada tab Fitur Lanjutan.
+Selain fungsi kasir inti, aplikasi menyediakan fitur lanjutan yang dikelompokkan menjadi tiga grup — laporan tambahan (termasuk Presensi), fitur pelanggan tambahan, serta bahan baku, supplier, dan harga — dan dapat dinyalakan dari Settings pada tab Fitur Lanjutan.
 
 Sejak versi `1.3.0`, aplikasi juga memiliki **Sync Cloud (Web Sync)**: transaksi yang tersimpan secara lokal dikirim otomatis ke backend cloud (Supabase) setiap 5 menit selama perangkat sudah dipasangkan (*paired*). Data yang tersinkron dapat dipantau dari web-app terpisah di folder `monitoring-frontend/`.
 
@@ -20,8 +20,10 @@ Sejak versi `1.3.0`, aplikasi juga memiliki **Sync Cloud (Web Sync)**: transaksi
 - Diskon bertingkat berdasarkan kuantitas item.
 - Diskon loyalty tier yang dapat ditumpuk dengan diskon bertingkat ketika fitur pelanggan tambahan aktif.
 - Pajak dan service yang dapat diaktifkan serta dikonfigurasi dari Settings.
+- Nomor Table dan jumlah Pax opsional yang dapat diaktifkan pada Settings → Resi.
 - Field tambahan checkout dan struk yang dapat dibuat, diubah, diwajibkan, disembunyikan, atau dihapus.
 - Data pelanggan atau member yang dipilih dari pemilih pelanggan, lalu disimpan pada transaksi dan ditampilkan di struk.
+- Modal pembayaran menampilkan ringkasan subtotal, diskon, pajak, service, total, serta informasi pelanggan/Table/Pax sesuai pengaturan.
 - Open bill untuk menyimpan pesanan yang belum dibayar, melanjutkan pesanan, menambah atau menghapus item, membayar, serta membatalkan dengan pengembalian stok.
 - Pembayaran tunai, QRIS, metode debit, transfer, dan metode custom yang dikelola dari Settings.
 - Perhitungan kembalian untuk pembayaran tunai.
@@ -57,10 +59,12 @@ Pilihan tambahan tidak mengubah harga dan item dengan pilihan berbeda menjadi ba
 ### Riwayat, laporan, dan ekspor
 
 - Riwayat transaksi dengan filter tanggal, filter shift, pengurutan, pagination, dan tampilan per hari atau per shift.
-- Tampilan per shift dapat dipilih melalui pemilih shift dan dikelompokkan per shift. Ketika terdapat lebih dari lima shift, daftar ditampilkan secara ringkas dengan opsi menampilkan semua shift.
+- Tampilan per shift dapat dipilih melalui pemilih shift dan dikelompokkan per shift. Shift aktif diberi penanda hijau serta ditampilkan di atas shift terbaru hingga terlama. Ketika terdapat lebih dari lima shift, daftar ditampilkan secara ringkas dengan opsi menampilkan semua shift.
 - Detail transaksi dan penghapusan transaksi individual.
 - Penghapusan seluruh transaksi dengan buffer undo selama 9 detik.
 - Laporan keuangan per shift atau seluruh shift: pendapatan, modal, laba/rugi, dan margin.
+- Total Pax dan rata-rata belanja per Pax hanya ditampilkan jika fitur Pax pada Settings → Resi aktif.
+- Pilihan rincian Total Pendapatan atau Total Pengeluaran diberi highlight saat dipilih.
 - Sales rate: item terlaris, item paling sedikit terjual, serta item yang belum pernah terjual.
 - Rangkuman per item: kuantitas, pendapatan, modal, laba, dan margin.
 - Laporan stok.
@@ -76,6 +80,17 @@ Fitur laporan lanjutan aktif ketika grup "Laporan Tambahan" dinyalakan dari tab 
 - Cash flow: analitik arus kas yang menggabungkan pendapatan transaksi dan pengeluaran shift, dikelompokkan per hari beserta grafik arus kas.
 - Ekspor laporan ke PDF melalui dialog penyimpanan Windows, dihasilkan dari HTML laporan yang dirender oleh aplikasi.
 - Seluruh perhitungan laporan lanjutan menggunakan kode murni di `src/utilities/insights.js` dan `src/utilities/cashflow.js`, dengan transaksi void dikeluarkan dari total.
+
+### Presensi Web-App
+
+Fitur Presensi dapat dinyalakan atau dimatikan melalui Settings → Fitur Lanjutan. Saat mati, sinkronisasi presensi, peringatan presensi saat tutup shift, dan Log Presensi di halaman Laporan tidak ditampilkan.
+
+- Saat fitur aktif, DEN POS mengirim lokasi perangkat ketika membuka shift agar pengguna Web-App dapat melakukan presensi dalam radius yang ditentukan.
+- Login shift tetap dapat dilanjutkan jika lokasi atau layanan presensi tidak tersedia; aplikasi memberi informasi bahwa presensi Web-App tidak tercatat.
+- Admin DEN POS dapat mengatur jarak maksimum presensi (default 20 meter, rentang 1–1000 meter), mengubah role pengguna Web-App (Kasir, Bar, Purchasing, Manager, atau Admin), dan mencabut akses.
+- Pengguna Web-App hanya dapat presensi masuk pada shift yang sudah dibuka. Ketika masih ada pengguna yang belum presensi keluar, DEN POS menampilkan peringatan saat shift akan ditutup dan menyediakan opsi untuk menutup shift dengan menandai mereka keluar.
+- Log presensi per shift tampil pada halaman Laporan dan dapat diekspor sebagai PDF.
+- Pengaturan pengguna Web-App dan presensi hanya tersedia bagi admin DEN POS, pada Settings → Fitur Lanjutan setelah fitur Presensi diaktifkan.
 
 ### Loyalty tier dan diskon pelanggan
 
@@ -165,16 +180,17 @@ Settings ditampilkan sebagai modal dengan tab berikut:
 | `Harga` | Diskon bertingkat, pajak dan service, serta ambang batas stok menipis. |
 | `Backup` | Backup, restore, dan pemeriksaan data. |
 | `Kelola Pengguna` | Menambah dan menghapus pengguna, serta mengubah password. |
-| `Fitur Lanjutan` | Master switch fitur lanjutan dan pengaturan per grup: laporan tambahan, fitur pelanggan tambahan, serta bahan baku, supplier, dan harga. |
+| `Fitur Lanjutan` | Master switch dan saklar tiap fitur: laporan tambahan (Insight, PDF, Cash Flow, Presensi), Loyalty Tier, serta fitur bahan baku, supplier, resep, dan HPP. |
 
 Catatan:
 
 - Nama warung memakai nilai yang diisi pengguna, sehingga struk menampilkan nama tempat usaha dan bukan label umum.
 - Metode pembayaran dapat ditambah dan dihapus, dengan minimal satu metode aktif.
 - Field struk dapat ditambah, diubah, diwajibkan, atau dihapus, termasuk field bawaan seperti nomor meja dan jumlah pax.
+- Fitur Table, Pax, dan nama pelanggan mengatur informasi yang ditampilkan pada checkout dan modal resi; metrik Pax pada Laporan hanya muncul saat fitur Pax aktif.
 - Diskon bertingkat dan kategori pengeluaran shift tetap dikelola dari Settings.
 - Basis tier loyalty (`Transaksi` atau `Lifetime`) diatur dari tab Harga.
-- Tab Fitur Lanjutan mengatur master switch dan tiap grup fitur lanjutan; halaman Fitur Lanjutan dan tab ini hanya dapat diakses oleh admin.
+- Tab Fitur Lanjutan mengatur master switch dan tiap fitur lanjutan; halaman Fitur Lanjutan dan pengaturan Presensi hanya dapat diakses oleh admin.
 
 ### Backup dan restore
 

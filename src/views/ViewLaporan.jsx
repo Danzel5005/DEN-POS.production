@@ -8,6 +8,7 @@ import { buildInsights } from "../utilities/insights.js";
 import { buildCashFlow } from "../utilities/cashflow.js";
 import { buildReportHTML } from "../utilities/reportHtml.js";
 import CashFlowShifts from "../components/CashFlowShifts.jsx";
+import { sortShiftsActiveFirst } from "../utilities/shiftState.js";
 
 function AttendanceReportSection({ toast_ }) {
   const [rows, setRows] = useState([]);
@@ -52,7 +53,7 @@ function ViewLaporan({
   openingCash = 0,
   totalExpenses = 0,
   onOpenExpenseModal,
-  onOpenCashModal, advancedFeatures, isAdvancedActive, warungName, warungAddress, warungPhone, currentUser, toast_, advancedData, }) {
+  onOpenCashModal, advancedFeatures, isAdvancedActive, receiptPaxEnabled = false, warungName, warungAddress, warungPhone, currentUser, toast_, advancedData, }) {
   const selShift = shifts.find(s=>s.id===selectedShiftId) || activeShift;
   const reportShiftId = selectedShiftId === "all" ? undefined : selectedShiftId || activeShift?.id;
   const [shiftTrx, setShiftTrx] = useState([]);
@@ -82,12 +83,17 @@ const revList=shiftTrx.reduce((s,t)=>s+Number(t?.total||0),0);
 const rev=shiftTrx.reduce((s,t)=>s+paidOf(t),0);
   const totalPax = shiftTrx.reduce((sum, trx) => sum + Math.max(0, Math.floor(Number(trx?.pax) || 0)), 0);
   const spendPerPax = totalPax ? rev / totalPax : 0;
+  const showPaxMetrics = receiptPaxEnabled === true;
   const mod=shiftTrx.reduce((s,t)=>{t.items.forEach(i=>{s+=(i.modal||0)*i.qty;});return s;},0);
   const sub=shiftTrx.reduce((s,t)=>s+t.subtotal,0);
   const laba=revList-mod;
   const hasModal=shiftTrx.some(t=>t.items.some(i=>i.modal>0));
+  const shiftsWithActive = activeShift?.id && !shifts.some((shift) => shift.id === activeShift.id)
+    ? [...shifts, activeShift]
+    : shifts;
+  const orderedShifts = sortShiftsActiveFirst(shiftsWithActive);
   const selectedShiftList = selectedShiftId === "all"
-    ? shifts
+    ? orderedShifts
     : selShift
       ? [selShift]
       : activeShift
@@ -301,7 +307,7 @@ const rev=shiftTrx.reduce((s,t)=>s+paidOf(t),0);
           <button onClick={()=>setSelectedShiftId("all")} style={{padding:"6px 12px",border:`2px solid ${selectedShiftId==="all"?G:BD}`,borderRadius:7,background:selectedShiftId==="all"?"#e8f5ee":W,color:selectedShiftId==="all"?G:TX,cursor:"pointer",fontFamily:"inherit",fontSize:10,fontWeight:700}}>
             Semua Shift
           </button>
-          {[...shifts].reverse().map(s=>(
+          {orderedShifts.map(s=>(
             <button key={s.id} onClick={()=>setSelectedShiftId(s.id)}
               style={{padding:"6px 12px",border:`2px solid ${selectedShiftId===s.id?G:BD}`,borderRadius:7,background:selectedShiftId===s.id?"#e8f5ee":W,color:selectedShiftId===s.id?G:TX,cursor:"pointer",fontFamily:"inherit",fontSize:10,fontWeight:700,textAlign:"left"}}>
               <span style={{display:"block"}}>Shift {s.shiftNum} · {s.tgl} {s.bln} {s.thn}</span>
@@ -312,9 +318,9 @@ const rev=shiftTrx.reduce((s,t)=>s+paidOf(t),0);
       </div>
 
       <div style={{fontSize:11,fontWeight:700,color:G,marginBottom:10}}>{shiftLabel} — {isReportLoading ? "memuat..." : `${shiftTrx.length} transaksi`}</div>
-      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(170px,1fr))",gap:10,marginBottom:12}}>
+      {showPaxMetrics && <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(170px,1fr))",gap:10,marginBottom:12}}>
         {[{l:"Total Pax",v:isReportLoading?"Memuat...":fmtNum(totalPax),s:"jumlah pengunjung dari transaksi ber-Pax"},{l:"Rata-rata Belanja / Pax",v:totalPax?fmt(spendPerPax):"—",s:"pendapatan dibagi jumlah Pax"}].map(card=><div key={card.l} style={{background:W,border:`1px solid ${BD}`,borderRadius:9,padding:"12px 14px"}}><div style={{fontSize:10,color:MT,marginBottom:4}}>{card.l}</div><div style={{fontSize:15,fontWeight:700,color:G}}>{card.v}</div><div style={{fontSize:9,color:MT,marginTop:2}}>{card.s}</div></div>)}
-      </div>
+      </div>}
       <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(170px,1fr))",gap:10,marginBottom:20}}>
         {[
           {l:"Total Pendapatan",v:fmt(rev),c:G,s:`dari ${shiftTrx.length} trx`,key:"income"},
@@ -324,7 +330,8 @@ const rev=shiftTrx.reduce((s,t)=>s+paidOf(t),0);
           {l:"Margin",v:sub>0?`${((netProfit/(sub||1))*100).toFixed(1)}%`:"-",c:"#1a5fb4",s:hasModal?"laba bersih / sub total":"belum ada modal",key:"margin"},
             ...(showResepHpp?[{l:"HPP dari Resep",v:hasHppResep?fmt(hppResep):"Belum ada resep",c:"#1a5fb4",s:hasHppResep?`${resepMissingCount.n>0?`${resepMissingCount.n} item tanpa resep`:"estimasi otomatis"}`:"-",key:"hppresep"}]:[]),
         ].map((s,i)=>{
-          const cardStyle = {background:W,border:`1px solid ${BD}`,borderRadius:9,padding:"12px 14px",boxShadow:"0 1px 4px rgba(0,0,0,0.04)",textAlign:"left",fontFamily:"inherit",cursor:"default",width:"100%",height:"100%"};
+          const selected = detailType === s.key;
+          const cardStyle = {background:selected ? (s.key === "income" ? "#eef8f0" : "#fff1f1") : W,border:`1px solid ${selected ? (s.key === "income" ? G : "#e84040") : BD}`,borderRadius:9,padding:"12px 14px",boxShadow:"0 1px 4px rgba(0,0,0,0.04)",textAlign:"left",fontFamily:"inherit",cursor:"default",width:"100%",height:"100%"};
           const content = (
             <>
               <div style={{fontSize:10,color:MT,marginBottom:4}}>{s.l}</div>
@@ -338,6 +345,7 @@ const rev=shiftTrx.reduce((s,t)=>s+paidOf(t),0);
               <button
                 key={i}
                 type="button"
+                aria-pressed={selected}
                 onClick={() => setDetailType(detailType === s.key ? null : s.key)}
                 style={{...cardStyle, cursor:"pointer"}}
               >
@@ -478,7 +486,7 @@ const rev=shiftTrx.reduce((s,t)=>s+paidOf(t),0);
         </div>
       )}
 
-      <AttendanceReportSection toast_={toast_} />
+      {advOn("attendance") && <AttendanceReportSection toast_={toast_} />}
 
 
       {selectedExpenseCategory && (

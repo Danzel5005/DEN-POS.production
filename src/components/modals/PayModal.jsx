@@ -1,7 +1,7 @@
 import { fmt, getCashPaymentNote } from "../../utilities/receipt.js";
 import { G, OR, W, LT, BD, TX, MT, row, inp, RADIUS, TYPOGRAPHY, COLOR_PALETTE } from "../../constants/design.js";
 
-export default function PayModal({ cartH, processPayment, setPayModal, paymentMethods = [], receiptAdditionals = [], paxEnabled = false, tableEnabled = false }) {
+export default function PayModal({ cartH, processPayment, setPayModal, paymentMethods = [], receiptAdditionals = [], paxEnabled = false, tableEnabled = false, customer, customerEnabled = true }) {
   // Group payment methods by category
   const groupedMethods = (paymentMethods || []).reduce((acc, method) => {
     const cat = method.category || "custom";
@@ -69,6 +69,13 @@ export default function PayModal({ cartH, processPayment, setPayModal, paymentMe
         {/* Body (scrollable) */}
         <div style={{ padding:"0 20px 20px 20px", overflowY:"auto", flex:"1 1 auto" }}>
 
+          {(customerEnabled || tableEnabled || paxEnabled) && (
+            <div style={{ background: COLOR_PALETTE.infoLight, borderRadius:RADIUS.md, padding:"8px 11px", marginBottom:11, fontSize:TYPOGRAPHY.label.fontSize, color:TX }}>
+              {customerEnabled && <div>Nama Pelanggan: <b>{customer?.name || "-"}</b></div>}
+              {tableEnabled && <div>Table: <b>{cartH.tableNumber || "-"}</b></div>}
+              {paxEnabled && <div>Pax: <b>{Number(cartH.pax) > 0 ? cartH.pax : "-"}</b></div>}
+            </div>
+          )}
 
           {/* Ringkasan order */}
           <div style={{ background:LT, borderRadius:RADIUS.md, padding:"9px 11px", marginBottom:11 }}>
@@ -80,6 +87,9 @@ export default function PayModal({ cartH, processPayment, setPayModal, paymentMe
             ))}
             <div style={{ borderTop:`1px solid ${BD}`, marginTop:7, paddingTop:7 }}>
               <div style={{ ...row, fontSize:TYPOGRAPHY.label.fontSize, color:MT }}><span>Subtotal</span><span>{fmt(cartH.subtotal)}</span></div>
+              {(cartH.discount || 0) > 0 && <div style={{ ...row, fontSize:TYPOGRAPHY.label.fontSize, color:G }}><span>Diskon</span><span>-{fmt(cartH.discount)}</span></div>}
+              {(cartH.pajak || 0) > 0 && <div style={{ ...row, fontSize:TYPOGRAPHY.label.fontSize, color:MT }}><span>Pajak</span><span>{fmt(cartH.pajak)}</span></div>}
+              {(cartH.service || 0) > 0 && <div style={{ ...row, fontSize:TYPOGRAPHY.label.fontSize, color:MT }}><span>Service</span><span>{fmt(cartH.service)}</span></div>}
               <div style={{ ...row, fontSize:15, fontWeight:700, marginTop:5 }}>
                 <span>Total</span><span style={{ color:OR }}>{fmt(cartH.total)}</span>
               </div>

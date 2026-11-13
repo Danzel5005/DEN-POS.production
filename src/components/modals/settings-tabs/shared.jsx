@@ -14,8 +14,8 @@ export const fieldStyle = {
   fontSize: TYPOGRAPHY.small.fontSize,
 };
 
-export function SaveButton({ children = "Simpan", onClick }) {
-  return <button onClick={onClick} style={{ padding: "8px 14px", background: G, color: W, border: "none", borderRadius: RADIUS.md, cursor: "pointer", fontFamily: "inherit", fontSize: TYPOGRAPHY.small.fontSize, fontWeight: 700 }}>{children}</button>;
+export function SaveButton({ children = "Simpan", onClick, disabled = false }) {
+  return <button onClick={onClick} disabled={disabled} style={{ padding: "8px 14px", background: G, color: W, border: "none", borderRadius: RADIUS.md, cursor: disabled ? "not-allowed" : "pointer", opacity: disabled ? 0.6 : 1, fontFamily: "inherit", fontSize: TYPOGRAPHY.small.fontSize, fontWeight: 700 }}>{children}</button>;
 }
 
 // PasswordInput — same `{ value, onChange, placeholder, style, compact }`

@@ -1,6 +1,6 @@
 {
   "name": "kasir-warung",
-  "version": "1.4.0",
+  "version": "1.4.2",
   "description": "Aplikasi POS",
   "author": {
     "name": "Danzel Tampilang",
@@ -22,6 +22,7 @@
     "electron:build": "vite build && electron-builder --win"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.119.0",
     "better-sqlite3": "^11.8.1",
     "node-hid": "^2.0.0",
     "node-machine-id": "^1.1.12",

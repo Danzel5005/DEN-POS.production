@@ -1,5 +1,10 @@
+import { lazy, Suspense } from "react";
 import { G, W, LT, BD, MT, TX, RADIUS, TYPOGRAPHY, COLOR_PALETTE } from "../../../constants/design.js";
 import { ADVANCED_FEATURE_GROUPS, DEFAULT_ADVANCED_FEATURES, LOYALTY_TIER_BASIS, normalizeLoyaltyTierBasis } from "../../../constants/advancedFeatures.js";
+import { isAdmin } from "../../../utilities/permissions.js";
+
+const AttendanceAdminTab = lazy(() => import("../AttendanceAdminTab.jsx"));
+const WebAttendanceUsersTab = lazy(() => import("../WebAttendanceUsersTab.jsx"));
 
 // ToggleSwitch — saklar gaya iOS minimal, tanpa dependensi. Dipakai untuk
 // saklar induk maupun tiap sub-fitur supaya tidak ada dua gaya kontrol.
@@ -34,9 +39,11 @@ function ToggleSwitch({ checked, onChange, disabled }) {
   );
 }
 
-export function AdvancedSettingsTab({ settingsH }) {
+export function AdvancedSettingsTab({ settingsH, authH }) {
   const adv = settingsH.settings.advancedFeatures || DEFAULT_ADVANCED_FEATURES;
   const masterOn = !!adv.enabled;
+  const attendanceOn = masterOn && !!adv.attendance;
+  const admin = isAdmin(authH?.currentUser);
 
   return <div>
     <div style={{ fontSize: TYPOGRAPHY.label.fontSize, color: MT, fontWeight: 600, marginBottom: 10 }}>
@@ -110,6 +117,15 @@ export function AdvancedSettingsTab({ settingsH }) {
             );
           })}
         </div>
+      )}
+      {attendanceOn && admin && (
+        <section style={{ padding: "12px 14px", background: W, border: `1px solid ${BD}`, borderRadius: RADIUS.md, marginBottom: 14 }}>
+          <div style={{ fontSize: TYPOGRAPHY.body.fontSize, fontWeight: 700, color: G, marginBottom: 10 }}>Pengaturan Presensi</div>
+          <Suspense fallback={<p style={{ color: MT, fontSize: 12 }}>Memuat pengaturan presensi…</p>}>
+            <WebAttendanceUsersTab isAdmin={admin} />
+            <AttendanceAdminTab />
+          </Suspense>
+        </section>
       )}
     </div>
   </div>;

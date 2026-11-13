@@ -173,37 +173,34 @@ export function CloudSyncSettingsTab({ authH, deviceH }) {
 
       {/* Pairing */}
       <Section title="Pairing Perangkat">
-        {paired && !(lastSync && !lastSync.ok) ? (
-          <div style={{ fontSize: TYPOGRAPHY.caption.fontSize, color: G, fontWeight: 600 }}>
-            ✓ Perangkat sudah dipasangkan. Data akan dikirim otomatis tiap 5 menit.
+        {paired && (
+          <div style={{ fontSize: TYPOGRAPHY.caption.fontSize, color: G, fontWeight: 600, marginBottom: 8 }}>
+            ✓ Perangkat terhubung. Anda tetap dapat meminta kode untuk user Web-App lain.
           </div>
-        ) : (
-          <>
-            <SaveButton onClick={() => d.register()}>
-              {d.registering ? "Meminta kode…" : "Daftarkan & Minta Kode"}
-            </SaveButton>
-            {d.pairing && lastSync && !lastSync.ok && (
-              <div style={{ marginTop: 10, padding: 12, background: LT, borderRadius: RADIUS.md, textAlign: "center" }}>
-                <div style={{ fontSize: TYPOGRAPHY.caption.fontSize, color: MT, marginBottom: 4 }}>
-                  Masukkan kode ini di Web-App → &quot;Hubungkan Perangkat&quot;
-                </div>
-                <div style={{ fontSize: 26, fontWeight: 800, letterSpacing: 4, color: G, fontFamily: "monospace" }}>
-                  {String(d.pairing.code || "").toUpperCase()}
-                </div>
-                {d.pairing.expiresAt && (
-                  <div style={{ fontSize: TYPOGRAPHY.caption.fontSize, color: MT, marginTop: 4 }}>
-                    Berlaku sampai {formatTime(d.pairing.expiresAt)}
-                  </div>
-                )}
-                <button style={{ ...ghostBtn(false), marginTop: 8 }} onClick={() => copyText(d.pairing.code, authH?.toast_)}>
-                  Salin kode
-                </button>
-                <div style={{ fontSize: TYPOGRAPHY.caption.fontSize, color: MT, marginTop: 8 }}>
-                  Menunggu persetujuan…
-                </div>
+        )}
+        <SaveButton onClick={() => d.register()} disabled={d.registering || d.loading}>
+          {d.registering ? "Meminta kode…" : paired ? "Minta Kode Pairing Tambahan" : "Daftarkan & Minta Kode"}
+        </SaveButton>
+        {d.pairing && (
+          <div style={{ marginTop: 10, padding: 12, background: LT, borderRadius: RADIUS.md, textAlign: "center" }}>
+            <div style={{ fontSize: TYPOGRAPHY.caption.fontSize, color: MT, marginBottom: 4 }}>
+              Masukkan kode ini di Web-App → &quot;Hubungkan Perangkat&quot;
+            </div>
+            <div style={{ fontSize: 26, fontWeight: 800, letterSpacing: 4, color: G, fontFamily: "monospace" }}>
+              {String(d.pairing.code || "").toUpperCase()}
+            </div>
+            {d.pairing.expiresAt && (
+              <div style={{ fontSize: TYPOGRAPHY.caption.fontSize, color: MT, marginTop: 4 }}>
+                Berlaku sampai {formatTime(d.pairing.expiresAt)}
               </div>
             )}
-          </>
+            <button style={{ ...ghostBtn(false), marginTop: 8 }} onClick={() => copyText(d.pairing.code, authH?.toast_)}>
+              Salin kode
+            </button>
+            <div style={{ fontSize: TYPOGRAPHY.caption.fontSize, color: MT, marginTop: 8 }}>
+              {paired ? "Gunakan kode ini untuk menghubungkan user tambahan." : "Menunggu persetujuan…"}
+            </div>
+          </div>
         )}
       </Section>
 

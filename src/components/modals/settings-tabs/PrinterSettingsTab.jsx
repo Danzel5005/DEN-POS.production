@@ -4,16 +4,15 @@ import { fieldStyle, SaveButton } from "./shared.jsx";
 
 export function PrinterSettingsTab({ settingsH }) {
   const isAndroid = typeof window !== "undefined" && !!window.kasirAndroid;
-  const [loading, setLoading] = useState(false);
   const [paperWidth, setPaperWidth] = useState(settingsH.settings.receiptPaperWidthMm || 80);
 
   useEffect(() => setPaperWidth(settingsH.settings.receiptPaperWidthMm || 80), [settingsH.settings.receiptPaperWidthMm]);
   useEffect(() => {
-    if (!isAndroid && settingsH.printerList.length === 0 && !loading) {
-      setLoading(true);
-      settingsH.openPrinterModal?.().finally(() => setLoading(false));
+    if (!isAndroid && settingsH.printerList.length === 0) {
+      settingsH.loadPrinters()
+        .catch((error) => settingsH.toast_?.(error?.message || "Gagal memuat daftar printer", "err"));
     }
-  }, [isAndroid, loading, settingsH.printerList.length, settingsH.openPrinterModal]);
+  }, [isAndroid, settingsH.printerList.length, settingsH.loadPrinters, settingsH.toast_]);
 
   const selectWidth = (width) => {
     setPaperWidth(width);

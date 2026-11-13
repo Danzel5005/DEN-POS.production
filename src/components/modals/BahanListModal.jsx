@@ -66,6 +66,11 @@ export default function BahanListModal({ list = [], search = "", onSearch, onPic
                   title="Klik untuk lihat detail bahan"
                 >
                   {b.nama} <span style={{ color: MT, fontWeight: 400 }}>({b.satuan || "-"})</span>
+                  {Number(b.stok) <= Number(b.minStok) && (
+                    <span style={{ display: "inline-block", marginLeft: 6, color: COLOR_PALETTE.danger, fontSize: TYPOGRAPHY.label.fontSize, fontWeight: 700 }}>
+                      ⚠ Stok menipis
+                    </span>
+                  )}
                 </button>
                 <button type="button" onClick={() => onEdit?.(b)} style={{ border: 0, borderRadius: RADIUS.sm, padding: "5px 9px", background: COLOR_PALETTE.infoLight, color: COLOR_PALETTE.info, cursor: "pointer", fontFamily: "inherit", fontSize: TYPOGRAPHY.label.fontSize, fontWeight: 600 }}>Edit</button>
                 <button type="button" onClick={() => onDelete?.(b)} style={{ border: 0, borderRadius: RADIUS.sm, padding: "5px 9px", background: COLOR_PALETTE.dangerLight, color: COLOR_PALETTE.danger, cursor: "pointer", fontFamily: "inherit", fontSize: TYPOGRAPHY.label.fontSize, fontWeight: 600 }}>Hapus</button>

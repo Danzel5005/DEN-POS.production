@@ -3,6 +3,7 @@ import { calcPrice } from "../utilities/calculations.js";
 import { api } from "../utilities/utils.js";
 import { resolveLine, stockQty, cartKeyFor, unitOptions, linePricing, stepQtyForUnit, computeStockErrors } from "../utilities/units.js";
 import { buildKdsTickets } from "../utilities/kds.js";
+import { mergeOpenBillItems } from "../utilities/openBills.js";
 
 // lineBaseQty — qty baris keranjang SELALU disimpan dalam SATUAN DASAR.
 // Jadi untuk baris yang sudah tersimpan, qty-nya langsung dipakai (JANGAN
@@ -265,12 +266,25 @@ function useCart({ toast_, getNow, receiptAdditionals: initialReceiptAdditionals
     bills, billId, persistBills, setBillId,
     applyStockView,  // NEW (Langkah 2): stok dihitung di main process
     customer = null, paxEnabled = false, tableEnabled = false,
+    mergeBillId = null, tableNumberOverride,
   }) => {
-    if (!items.length || !checkRequiredAdditionals(receiptAdditionals) || !checkRequiredManualDiscount() || (paxEnabled && Number(pax) <= 0)) { toast_("Isi field wajib dan pesanan dulu", "err"); return; }
-    if (stockErrors.length > 0) {
-      const e = stockErrors[0];
+    if (!items.length || !checkRequiredAdditionals(receiptAdditionals) || !checkRequiredManualDiscount() || (paxEnabled && Number(pax) <= 0)) { toast_("Isi field wajib dan pesanan dulu", "err"); return false; }
+    const mergeTarget = mergeBillId == null ? null : bills.find((bill) => String(bill.id) === String(mergeBillId));
+    if (mergeBillId != null && !mergeTarget) {
+      toast_("Open Bill dengan nomor meja tersebut tidak ditemukan. Muat ulang daftar bill lalu coba lagi.", "err");
+      return false;
+    }
+    const sourceBill = mergeTarget && activeBill && String(mergeTarget.id) !== String(activeBill.id)
+      ? activeBill
+      : null;
+    const itemsToSave = mergeTarget ? mergeOpenBillItems(mergeTarget.items || [], items) : items;
+    const errors = mergeTarget
+      ? computeStockErrors({ menu, cartItems: itemsToSave, heldItems: [...(mergeTarget.items || []), ...(sourceBill?.items || [])], baseQtyOf: lineBaseQty })
+      : stockErrors;
+    if (errors.length > 0) {
+      const e = errors[0];
       toast_(`Stok "${e.nama}" tidak mencukupi: butuh ${e.needed}, tersedia ${e.available}`, "err");
-      return;
+      return false;
     }
     const t = getNow();
     
@@ -284,7 +298,7 @@ function useCart({ toast_, getNow, receiptAdditionals: initialReceiptAdditionals
     };
     const partyData = {
       ...(paxEnabled ? { pax: Math.max(1, Math.floor(Number(pax) || 1)) } : {}),
-      ...(tableEnabled ? { tableNumber: String(tableNumber || "").trim() } : {}),
+      ...(tableEnabled ? { tableNumber: String(tableNumberOverride ?? tableNumber ?? "").trim() } : {}),
     };
 
     // Build receipt additional values for the bill
@@ -299,17 +313,20 @@ function useCart({ toast_, getNow, receiptAdditionals: initialReceiptAdditionals
     
     let updatedBills;
     let stockDelta = null;
-    if (activeBill) {
+    const billToUpdate = mergeTarget || activeBill;
+    if (billToUpdate) {
       // Calculate stock delta: new items - old items.
       // qty baris (bill lama & keranjang) SUDAH dalam SATUAN DASAR → pakai
       // apa adanya lewat lineBaseQty(). JANGAN stockQty() — itu akan
       // mengalikannya dengan factor lagi (sumber bug "50 x 50 = 2500").
-      const oldItemsById = (activeBill.items || []).reduce((acc, item) => {
+      const heldItems = sourceBill ? sourceBill.items || [] : billToUpdate.items || [];
+      const changedItems = sourceBill || mergeTarget ? items : itemsToSave;
+      const oldItemsById = heldItems.reduce((acc, item) => {
         const existing = acc[item.id] || { qty: 0 };
         acc[item.id] = { ...existing, qty: existing.qty + lineBaseQty(item) };
         return acc;
       }, {});
-      const newItemsById = items.reduce((acc, item) => {
+      const newItemsById = changedItems.reduce((acc, item) => {
         const existing = acc[item.id] || { qty: 0 };
         acc[item.id] = { ...existing, qty: existing.qty + lineBaseQty(item) };
         return acc;
@@ -330,16 +347,28 @@ function useCart({ toast_, getNow, receiptAdditionals: initialReceiptAdditionals
       // Bahan baku: kembalikan pemakaian bill lama lalu potong sesuai keranjang
       // terkini. Dua langkah agar perubahan komposisi item tetap akurat.
       if (applyBahanUsage) {
-        applyBahanUsage(activeBill.items || [], 1);
-        applyBahanUsage(items, -1);
+        if (sourceBill) {
+          applyBahanUsage(sourceBill.items || [], 1);
+          applyBahanUsage(items, -1);
+        } else if (mergeTarget) {
+          applyBahanUsage(items, -1);
+        } else {
+          applyBahanUsage(billToUpdate.items || [], 1);
+          applyBahanUsage(itemsToSave, -1);
+        }
       }
       
-      updatedBills = bills.map(b =>
-        String(b.id) === String(activeBill.id)
-          ? { ...b, items: withUnitLabel(items), updatedAt: t.timestamp, manualDiscountValue, manualDiscountType: effectiveManualDiscountType, ...customerData, ...partyData, ...receiptAdditionalData }
+      updatedBills = bills.filter((bill) => !sourceBill || String(bill.id) !== String(sourceBill.id)).map(b =>
+        String(b.id) === String(billToUpdate.id)
+          ? {
+            ...b,
+            items: withUnitLabel(itemsToSave),
+            updatedAt: t.timestamp,
+            ...(mergeTarget ? {} : { manualDiscountValue, manualDiscountType: effectiveManualDiscountType, ...customerData, ...partyData, ...receiptAdditionalData }),
+          }
           : b
       );
-      toast_('Open Bill diperbarui', "ok");
+      toast_(mergeTarget ? `Item ditambahkan ke Open Bill Table ${mergeTarget.tableNumber}` : 'Open Bill diperbarui', "ok");
     } else {
       // New bill - all items are new stock deduction (dalam satuan dasar)
       stockDelta = items.reduce((acc, item) => {
@@ -360,16 +389,17 @@ function useCart({ toast_, getNow, receiptAdditionals: initialReceiptAdditionals
     // Stok dihitung di main process (Langkah 2) dan persist ke SQLite/JSON;
     // view di-patch dari hasil { stock } supaya UI tetap akurat.
     if (stockDelta && Object.keys(stockDelta).length > 0) {
-      const res = await api.applyStock(stockDelta, { type: "openbill", ref: activeBill?.id || billId });
+      const res = await api.applyStock(stockDelta, { type: "openbill", ref: billToUpdate?.id || billId });
       if (res?.ok && res.stock && applyStockView) applyStockView(res.stock);
     }
     
     await persistBills(updatedBills);
+    if (sourceBill?.kdsSent) void api.kdsCancel(String(sourceBill.id));
     try {
-      const priorBill = activeBill && (bills.find((bill) => String(bill.id) === String(activeBill.id)) || activeBill);
-      const billRef = activeBill?.id || billId;
+      const priorBill = billToUpdate && (bills.find((bill) => String(bill.id) === String(billToUpdate.id)) || billToUpdate);
+      const billRef = billToUpdate?.id || billId;
       const kdsResult = await queueKdsTickets({
-        items,
+        items: itemsToSave,
         prevItems: priorBill?.kdsSent ? priorBill.items || [] : undefined,
         meta: {
           sourceRef: String(billRef),
@@ -387,7 +417,8 @@ function useCart({ toast_, getNow, receiptAdditionals: initialReceiptAdditionals
     } catch { /* KDS must never block saving an open bill. */ }
     clearCart();
     setDrawerOpen(false);
-  }, [items, receiptAdditionalValues, receiptAdditionals, activeBill, toast_, getNow, clearCart, stockErrors, applyBahanUsage, pax, tableNumber, manualDiscountValue, effectiveManualDiscountType, checkRequiredManualDiscount, queueKdsTickets]);
+    return true;
+  }, [items, receiptAdditionalValues, receiptAdditionals, activeBill, toast_, getNow, clearCart, stockErrors, applyBahanUsage, pax, tableNumber, manualDiscountValue, effectiveManualDiscountType, checkRequiredManualDiscount, queueKdsTickets, menu]);
 
   // deps: needs receiptAdditionals to read current receipt additionals config
   const loadBillToCart = useCallback((bill) => {
@@ -537,6 +568,7 @@ const processPayment = useCallback(async ({
     items, subtotal, pajak, service, discount, total, pricingConfig, manualDiscount, paidNum, kembalian, canPay,
     stockErrors,
     setDrawerOpen, updateReceiptAdditionalValue, setMetode, setPaid,
+    setActiveBill,
     addToCart, decCart, delCart, clearCart,
     setUnit, resolveLine,
     saveOpenBill, loadBillToCart, processPayment, checkRequiredAdditionals, checkRequiredManualDiscount, getCanPay,

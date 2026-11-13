@@ -49,3 +49,6 @@ verify_jwt = false
 
 [functions.attendance-exchange]
 verify_jwt = false
+
+[functions.submit-attendance]
+verify_jwt = true

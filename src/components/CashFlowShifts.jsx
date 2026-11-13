@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import CashFlowChart from "./CashFlowChart.jsx";
 import { buildCashFlow } from "../utilities/cashflow.js";
 import { fmt } from "../utilities/receipt.js";
+import { sortShiftsActiveFirst } from "../utilities/shiftState.js";
 import { G, W, BD, TX, MT } from "../constants/design.js";
 
 const card = { background: W, border: `1px solid ${BD}`, borderRadius: 9, padding: "12px 14px" };
@@ -107,7 +108,7 @@ export default function CashFlowShifts({ shifts, activeShift, ...displayProps })
   const allShifts = useMemo(() => {
     const list = [...shifts];
     if (activeShift?.id && !list.some(s => s.id === activeShift.id)) list.push(activeShift);
-    return list.reverse();
+    return sortShiftsActiveFirst(list);
   }, [shifts, activeShift]);
   const openShifts = allShifts.filter(s => s.status === "open");
   return (

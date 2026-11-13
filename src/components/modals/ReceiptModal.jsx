@@ -1,13 +1,11 @@
 import { useEffect, useState } from "react";
-import { calcPrice } from "../../utilities/calculations.js";
 import { fmt, getCashPaymentNote } from "../../utilities/receipt.js";
 import { METODE_LABELS} from "../../constants/payments.js";
-import { METODE_COLORS, G, OR, W, BD, MT, row, RADIUS, TYPOGRAPHY, COLOR_PALETTE } from "../../constants/design.js";
+import { METODE_COLORS, G, OR, W, BD, MT, TX, row, RADIUS, TYPOGRAPHY, COLOR_PALETTE } from "../../constants/design.js";
 
-export default function ReceiptModal({ receipt, logo, printReceipt, setReceipt, receiptAdditionals, qrisImages, paymentMethods = [] }) {
+export default function ReceiptModal({ receipt, logo, printReceipt, setReceipt, receiptAdditionals, qrisImages, paymentMethods = [], customerEnabled = true, paxEnabled = false, tableEnabled = false }) {
   const [isPrinting, setIsPrinting] = useState(false);
   const [progress, setProgress] = useState(0);
-  const cashPaymentNote = receipt.metodeBayar === "cash" ? getCashPaymentNote(receipt.bayar, receipt.total) : "";
 
   useEffect(() => {
     if (!isPrinting) return undefined;
@@ -19,6 +17,11 @@ export default function ReceiptModal({ receipt, logo, printReceipt, setReceipt, 
     }, 180);
     return () => window.clearInterval(interval);
   }, [isPrinting]);
+
+  if (!receipt) return null;
+
+  const paymentKey = String(receipt.metodeBayar || "");
+  const cashPaymentNote = paymentKey === "cash" ? getCashPaymentNote(receipt.bayar, receipt.total) : "";
 
   const handlePrint = async () => {
     if (isPrinting) return;
@@ -84,15 +87,15 @@ export default function ReceiptModal({ receipt, logo, printReceipt, setReceipt, 
           {(() => {
             // Use stored label from transaction (metodeBayarLabel), fallback to lookup, NEVER show raw key
             const metodeLabel = receipt.metodeBayarLabel
-              ?? paymentMethods.find(m => m.key === receipt.metodeBayar)?.label 
-              ?? METODE_LABELS[receipt.metodeBayar] 
-              ?? receipt.metodeBayar.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
-            const isQris = paymentMethods.find(m => m.key === receipt.metodeBayar)?.category === "qris" 
-              || (receipt.metodeBayar && receipt.metodeBayar.startsWith("qris"));
-            const qrisImage = isQris && qrisImages && qrisImages[receipt.metodeBayar];
+              ?? paymentMethods.find(m => m.key === paymentKey)?.label
+              ?? METODE_LABELS[paymentKey]
+              ?? (paymentKey ? paymentKey.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) : "Metode tidak diketahui");
+            const isQris = paymentMethods.find(m => m.key === paymentKey)?.category === "qris"
+              || paymentKey.startsWith("qris");
+            const qrisImage = isQris && qrisImages && qrisImages[paymentKey];
             return (
               <>
-                <div style={{ fontSize:TYPOGRAPHY.label.fontSize, fontWeight:700, color:(METODE_COLORS[receipt.metodeBayar] || { tc:MT }).tc }}>
+                <div style={{ fontSize:TYPOGRAPHY.label.fontSize, fontWeight:700, color:(METODE_COLORS[paymentKey] || { tc:MT }).tc }}>
                   {metodeLabel}
                 </div>
                 <div style={{ borderTop:"1px dashed #ccc", margin:"7px 0" }}/>
@@ -113,6 +116,13 @@ export default function ReceiptModal({ receipt, logo, printReceipt, setReceipt, 
 
         {/* Body (scrollable) */}
         <div style={{ padding:"0 17px 17px", overflowY:"auto", flex:"1 1 auto" }}>
+          {(customerEnabled || tableEnabled || paxEnabled) && (
+            <div style={{ fontSize:TYPOGRAPHY.label.fontSize, color:TX, marginBottom:8 }}>
+              {customerEnabled && <div>Nama Pelanggan: <b>{receipt.customerNama || "-"}</b></div>}
+              {tableEnabled && <div>Table: <b>{receipt.tableNumber || "-"}</b></div>}
+              {paxEnabled && <div>Pax: <b>{Number(receipt.pax) > 0 ? receipt.pax : "-"}</b></div>}
+            </div>
+          )}
           {receipt.items.map((item, i) => (
             <div key={i} style={{ ...row, fontSize:TYPOGRAPHY.small.fontSize, marginBottom:2 }}>
               <span>{item.qty}x {item.nama}</span>
@@ -140,7 +150,7 @@ export default function ReceiptModal({ receipt, logo, printReceipt, setReceipt, 
           <div style={{ ...row, fontSize:TYPOGRAPHY.body.fontSize, fontWeight:700, marginTop:3 }}>
             <span>TOTAL</span><span style={{ color:OR }}>{fmt(receipt.total)}</span>
           </div>
-          {receipt.metodeBayar === "cash" && <div style={{ ...row, fontSize:TYPOGRAPHY.small.fontSize, color:cashPaymentNote ? OR : G, fontWeight:700, marginTop:4 }}>
+          {paymentKey === "cash" && <div style={{ ...row, fontSize:TYPOGRAPHY.small.fontSize, color:cashPaymentNote ? OR : G, fontWeight:700, marginTop:4 }}>
             <span>{cashPaymentNote || "LUNAS"}</span>
             {!cashPaymentNote && <span>{fmt(receipt.bayar)}</span>}
           </div>}
@@ -150,12 +160,12 @@ export default function ReceiptModal({ receipt, logo, printReceipt, setReceipt, 
           {(() => {
             // Use stored label from transaction (metodeBayarLabel), fallback to lookup, NEVER show raw key
             const metodeLabel = receipt.metodeBayarLabel
-              ?? paymentMethods.find(m => m.key === receipt.metodeBayar)?.label 
-              ?? METODE_LABELS[receipt.metodeBayar] 
-              ?? receipt.metodeBayar.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
-            const isQris = paymentMethods.find(m => m.key === receipt.metodeBayar)?.category === "qris" 
-              || (receipt.metodeBayar && receipt.metodeBayar.startsWith("qris"));
-            const qrisImage = isQris && qrisImages && qrisImages[receipt.metodeBayar];
+              ?? paymentMethods.find(m => m.key === paymentKey)?.label
+              ?? METODE_LABELS[paymentKey]
+              ?? (paymentKey ? paymentKey.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) : "Metode tidak diketahui");
+            const isQris = paymentMethods.find(m => m.key === paymentKey)?.category === "qris"
+              || paymentKey.startsWith("qris");
+            const qrisImage = isQris && qrisImages && qrisImages[paymentKey];
             return qrisImage ? (
               <div style={{ textAlign: "center", marginBottom: 10 }}>
                 <img 

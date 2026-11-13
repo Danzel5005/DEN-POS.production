@@ -4,7 +4,8 @@ export const ADVANCED_FEATURE_GROUPS = [
     items: [
       { key: "insights", label: "Insight Penjualan", desc: "Jam ramai dan rata-rata per order, dihitung dari transaksi tersimpan." },
       { key: "pdfReport", label: "Ekspor Laporan PDF", desc: "Simpan laporan sebagai PDF memakai jalur cetak bawaan." },
-      { key: "cashFlow", label: "Cash Flow Lanjutan", desc: "Pemasukan/pengeluaran per sumber, laba rugi, pelacakan hutang." }
+      { key: "cashFlow", label: "Cash Flow Lanjutan", desc: "Pemasukan/pengeluaran per sumber, laba rugi, pelacakan hutang." },
+      { key: "attendance", label: "Presensi", desc: "Sinkronisasi presensi shift dan log presensi Web-App." },
     ],
   },
   {
@@ -34,6 +35,7 @@ export const DEFAULT_ADVANCED_FEATURES = {
   supplier: false,     
   resepHpp: false,     
   cashFlow: false,     
+  attendance: false,
 };
 
 // Basis perhitungan loyalty tier — dipilih user di Pengaturan (Fitur Lanjutan).

@@ -15,12 +15,16 @@ export function createPrinterHandlers({ settings, setSettings, toast_, setPrinte
     return res;
   }, [settings, toast_]);
 
-  // deps kosong aman: hanya setter, tidak baca state apapun.
-  const openPrinterModal = useCallback(async () => {
+  const loadPrinters = useCallback(async () => {
     const list = await api.getPrinters();
     setPrinterList(list);
-    setPrinterModal(true);
+    return list;
   }, []);
+
+  const openPrinterModal = useCallback(async () => {
+    await loadPrinters();
+    setPrinterModal(true);
+  }, [loadPrinters]);
 
   // PENTING: men-spread `settings` langsung dari closure ({...settings, ...}).
   // Wajib [settings, toast_] di deps — tanpa ini, ganti printer kedua kalinya
@@ -47,5 +51,5 @@ export function createPrinterHandlers({ settings, setSettings, toast_, setPrinte
     toast_("Lebar kertas resi disimpan", "ok");
   }, [settings, toast_]);
 
-  return { printHTML, openPrinterModal, selectPrinter, setPrinterModal, setReceiptPaperWidth };
+  return { printHTML, loadPrinters, openPrinterModal, selectPrinter, setPrinterModal, setReceiptPaperWidth };
 }

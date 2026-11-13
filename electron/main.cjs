@@ -192,7 +192,7 @@ function createWindow() {
   console.log("[Main] Creating BrowserWindow...");
   const mainWin = new BrowserWindow({ width: 1400, height: 860, minWidth: 1020, minHeight: 680, title: "Kasir — Warung", webPreferences: { preload: path.join(__dirname, "preload.js"), nodeIntegration: false, contextIsolation: true } });
   mainWin.setMenuBarVisibility(false);
-  if (isDev) mainWin.loadURL("http://localhost:5173");
+  if (isDev) mainWin.loadURL(process.env.KASIR_DEV_SERVER_URL || "http://localhost:5173");
   else mainWin.loadFile(path.join(__dirname, "../dist/index.html"));
   mainWin.webContents.on("did-finish-load", () => startRawScannerFallback(mainWin));
   mainWin.webContents.on("did-fail-load", (_event, errorCode, errorDescription) => console.error("[Main] Failed to load:", errorCode, errorDescription));

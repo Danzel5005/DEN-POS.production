@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { G, W, BD, MT, row, RADIUS, TYPOGRAPHY, COLOR_PALETTE } from "../../constants/design.js";
+import { G, W, BD, row, RADIUS, TYPOGRAPHY, COLOR_PALETTE } from "../../constants/design.js";
 import {
   PrinterSettingsTab,
   WarungSettingsTab,
@@ -14,8 +14,6 @@ import {
   KdsSettingsTab,
 } from "./settings-tabs/index.js";
 import { useDeviceSync } from "../../hooks/useDeviceSync.js";
-import WebAttendanceUsersTab from "./WebAttendanceUsersTab.jsx";
-import { isAdmin } from "../../utilities/permissions.js";
 
 const SETTINGS_TABS = [
   ["printer", "Printer"],
@@ -29,7 +27,6 @@ const SETTINGS_TABS = [
   ["advanced", "Fitur Lanjutan"],
   ["cloud", "Sync Cloud"],
   ["kds", "KDS"],
-  ["web-users", "User Web-App"],
 ];
 
 function SettingsTabButton({ tab, activeTab, onSelect, children }) {
@@ -47,10 +44,9 @@ function SettingsPanel({ tab, settingsH, authH, menu, cats, deviceH }) {
     case "pricing": return <PricingSettingsTab {...panelProps} />;
     case "backup": return <BackupSettingsTab {...panelProps} />;
     case "users": return <UsersSettingsTab authH={authH} />;
-    case "advanced": return <AdvancedSettingsTab {...panelProps} />;
+    case "advanced": return <AdvancedSettingsTab {...panelProps} authH={authH} />;
     case "cloud": return <CloudSyncSettingsTab authH={authH} deviceH={deviceH} />;
     case "kds": return <KdsSettingsTab settingsH={settingsH} cats={cats} deviceH={deviceH} />;
-    case "web-users": return <WebAttendanceUsersTab isAdmin={isAdmin(authH.currentUser)} />;
     default: return null;
   }
 }
@@ -63,7 +59,7 @@ export default function SettingsModal({ settingsH, authH, menu = [], cats = [] }
   const deviceH = useDeviceSync({ toast_: settingsH?.toast_, isAdmin: true });
   const close = () => settingsH.setSettingsModal(false);
 
-  return <div className="settings-modal-backdrop" style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 300 }} onClick={(event) => event.target === event.currentTarget && close()}>
+  return <div className="settings-modal-backdrop" style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 700 }} onClick={(event) => event.target === event.currentTarget && close()}>
     <div className="settings-modal-panel" style={{ background: W, borderRadius: RADIUS.lg, padding: 20, width: "min(755px, calc(100vw - 24px))", height: "min(559px, calc(100dvh - 24px))", minWidth: 0, minHeight: 0, boxSizing: "border-box", boxShadow: "0 20px 60px rgba(0,0,0,0.3)", display: "flex", flexDirection: "column", overflow: "hidden" }}>
       <div style={{ ...row, marginBottom: 14 }}>
         <span style={{ fontSize: TYPOGRAPHY.body.fontSize, fontWeight: 700, color: G }}>Pengaturan</span>
@@ -71,7 +67,7 @@ export default function SettingsModal({ settingsH, authH, menu = [], cats = [] }
       </div>
       <div style={{ display: "flex", flex: 1, minHeight: 0, marginBottom: 14, border: `1px solid ${BD}`, borderRadius: RADIUS.md, overflow: "hidden" }}>
         <aside className="settings-modal-tabs" style={{ width: 146, minWidth: 146, boxSizing: "border-box", background: G, display: "flex", flexDirection: "column", flexShrink: 0, overflowY: "auto" }}>
-          {SETTINGS_TABS.filter(([key]) => (!isAndroid || !["backup", "cloud"].includes(key)) && (key !== "web-users" || isAdmin(authH.currentUser))).map(([key, label]) => <SettingsTabButton key={key} tab={tab} activeTab={tab} onSelect={setTab}>{label}</SettingsTabButton>)}
+          {SETTINGS_TABS.filter(([key]) => (!isAndroid || !["backup", "cloud"].includes(key))).map(([key, label]) => <SettingsTabButton key={key} tab={key} activeTab={tab} onSelect={setTab}>{label}</SettingsTabButton>)}
         </aside>
         <div className="settings-modal-content" style={{ flex: 1, overflowY: "auto", padding: 16, minWidth: 0 }}>
           <SettingsPanel tab={tab} settingsH={settingsH} authH={authH} menu={menu} cats={cats} deviceH={deviceH} />

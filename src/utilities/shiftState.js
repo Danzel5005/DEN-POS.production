@@ -22,4 +22,13 @@ function nextShiftNum(shifts = []) {
   return max + 1;
 }
 
-export { resolveShiftTarget, nextShiftNum };
+function compareShiftsActiveFirst(a, b) {
+  const activeOrder = Number(b?.status === "open") - Number(a?.status === "open");
+  return activeOrder || Number(b?.shiftNum || 0) - Number(a?.shiftNum || 0);
+}
+
+function sortShiftsActiveFirst(shifts = []) {
+  return [...shifts].sort(compareShiftsActiveFirst);
+}
+
+export { resolveShiftTarget, nextShiftNum, compareShiftsActiveFirst, sortShiftsActiveFirst };

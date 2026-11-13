@@ -4,6 +4,7 @@ import { fmt } from "../utilities/receipt.js";
 import { METODE_LABELS } from "../constants/payments.js";
 import { G, OR, W, LT, BD, TX, MT, METODE_COLORS, inp, row } from "../constants/design.js";
 import { Tag } from "../components/Tag.jsx";
+import { compareShiftsActiveFirst, sortShiftsActiveFirst } from "../utilities/shiftState.js";
 
 // Human-readable labels for void reasons (kept in sync with useHistoryVoid.js).
 const VOID_REASON_LABELS = {
@@ -47,16 +48,17 @@ function ViewRiwayat({
   shifts.forEach(s => {
     shiftLabels[s.id] = `Shift ${s.shiftNum} — ${s.hari} ${s.tgl} ${s.bln} ${s.thn} · ${s.operator}`;
   });
+  const shiftsById = new Map(shifts.map((shift) => [shift.id, shift]));
 
   // ── Get sorted shift keys, with collapse for > 5
   const shiftKeys = Object.keys(histByShift).sort((a, b) => {
     // "Tanpa Shift" always last
     if (a === "Tanpa Shift") return 1;
     if (b === "Tanpa Shift") return -1;
-    // sort by shiftNum descending (newest first)
-    const sa = histByShift[a].shift;
-    const sb = histByShift[b].shift;
-    return (sb?.shiftNum || 0) - (sa?.shiftNum || 0);
+    // Keep the active shift above closed shifts, then newest to oldest.
+    const sa = shiftsById.get(a) || histByShift[a].shift;
+    const sb = shiftsById.get(b) || histByShift[b].shift;
+    return compareShiftsActiveFirst(sa, sb);
   });
 
   const displayedShiftKeys = showAllShifts
@@ -223,12 +225,12 @@ function ViewRiwayat({
               cursor:"pointer", fontFamily:"inherit", fontSize:10, fontWeight:600 }}>
             Semua
           </button>
-          {[...shifts].reverse().slice(0, 20).map(s => (
+          {sortShiftsActiveFirst(shifts).slice(0, 20).map(s => (
             <button key={s.id} onClick={() => setShiftIdFilter(s.id)}
               style={{ padding:"3px 8px", border:`1px solid ${shiftIdFilter === s.id ? G : BD}`, borderRadius:5,
                 background:shiftIdFilter === s.id ? "#e8f5ee" : W, color:shiftIdFilter === s.id ? G : TX,
                 cursor:"pointer", fontFamily:"inherit", fontSize:10, fontWeight:600 }}>
-              Shift {s.shiftNum} {s.startJam}
+              Shift {s.shiftNum} {s.startJam} {s.status === "open" && <span>🟢 Aktif</span>}
             </button>
           ))}
         </div>
@@ -271,18 +273,19 @@ function ViewRiwayat({
             : displayedShiftKeys.map((shiftKey, idx) => {
                 const group = histByShift[shiftKey];
                 const isUncategorized = shiftKey === "Tanpa Shift";
+                const shift = shiftsById.get(shiftKey) || group.shift;
                 const shiftTotal = group.trxs.reduce((s,t) => s + t.total, 0);
                 const shiftPax = group.trxs.reduce((s,t) => s + (t.pax||0), 0);
                 const label = isUncategorized
                   ? "Tanpa Shift"
-                  : shiftLabels[shiftKey] || `Shift ${group.shift?.shiftNum || "?"}`;
+                  : shiftLabels[shiftKey] || `Shift ${shift?.shiftNum || "?"}`;
                 const exp = isShiftExpanded(shiftKey, idx);
                 return (
                   <div key={shiftKey} style={{ marginBottom:16 }}>
                     <div onClick={() => toggleShift(shiftKey)}
                       style={{ ...row, padding:"5px 10px", background:isUncategorized ? "#888" : "#2a5a8a", borderRadius:6, marginBottom:6, cursor:"pointer" }}>
                       <span style={{ color:W, fontWeight:700, fontSize:11 }}>
-                        {exp ? "▾" : "▸"} {label}
+                        {exp ? "▾" : "▸"} {label} {shift?.status === "open" && <span>🟢 Aktif</span>}
                       </span>
                       <span style={{ color:"rgba(255,255,255,0.8)", fontSize:10 }}>
                         {group.trxs.length} trx · {shiftPax} pax · <b style={{ color:"#a8ffcc" }}>{fmt(shiftTotal)}</b>

@@ -127,3 +127,11 @@ Full details: **`monitoring-backend/DEPLOYMENT.md`**
 - ✅ Laporan page shows real revenue/data (Rp 177.000 from live DB)
 - ✅ Riwayat page lists transactions with detail modal
 - ✅ Frontend production build succeeds
+
+## Supabase Attendance
+
+The current Vercel frontend uses Supabase Auth, the public project URL, and the public anon/publishable key. Set `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` in Vercel's environment settings and require HTTPS for browser geolocation. Never expose `SUPABASE_SERVICE_ROLE_KEY` or put it in any `VITE_` variable.
+
+For the desktop installer, provide the same two public variables in an ignored root `.env` before running `npm run electron:build`. The desktop attendance module loads only when an admin opens **Pengaturan → Presensi**; missing configuration or Supabase downtime does not block the POS or web routes. Admin sign-in happens inside that desktop tab.
+
+Employee check-in/out uses the server-validated Supabase flow. Offline fingerprint hardware is a separate future integration; select the exact device model and protocol before designing enrollment or syncing offline punches. Do not treat a device clock as a trusted server timestamp.

@@ -258,6 +258,8 @@ function ViewKasir({
               </div>
             )}
             {discount > 0 && <div style={{...row,fontSize:11,color:G,marginBottom:3}}><span>Diskon</span><span style={{fontWeight:600}}>-{fmt(discount)}</span></div>}
+            {pajak > 0 && <div style={{...row,fontSize:11,color:MT,marginBottom:3}}><span>Pajak</span><span style={{fontWeight:600,color:TX}}>{fmt(pajak)}</span></div>}
+            {service > 0 && <div style={{...row,fontSize:11,color:MT,marginBottom:3}}><span>Service</span><span style={{fontWeight:600,color:TX}}>{fmt(service)}</span></div>}
             <div style={{...row,borderTop:`1px solid ${BD}`,paddingTop:7,marginBottom:9}}>
               <span style={{fontSize:14,fontWeight:700}}>Total</span>
               <span style={{fontSize:15,fontWeight:700,color:OR}}>{fmt(total)}</span>

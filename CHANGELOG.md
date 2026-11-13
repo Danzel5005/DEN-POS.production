@@ -2,6 +2,32 @@
 
 All notable changes to this project are documented in this file.
 
+## v1.4.2 — Perubahan sejak v1.3.0
+
+### Fitur Baru dan Penyempurnaan
+
+- **Kitchen Display System (KDS):** tampilan pesanan dapur dan pengiriman tiket
+  dari kasir ke perangkat KDS melalui pairing Sync Cloud.
+- **Pertukaran stok:** inbox restock untuk menerima atau menolak permintaan
+  stok dari perangkat/toko lain, dengan konfirmasi status ke cloud.
+- **Presensi dan hak akses:** pertukaran data presensi serta kontrol akses
+  berbasis peran.
+- **Monitoring Web:** dashboard web untuk melihat data sinkronisasi dan
+  mengelola perangkat yang terhubung; backend monitoring menggunakan Supabase.
+- **Android POS (uji coba):** wrapper Android untuk POS dengan dukungan printer
+  thermal Bluetooth. Fitur khusus Electron, termasuk backup dan Sync Cloud,
+  belum tersedia pada build Android.
+
+### Perbaikan Bug
+
+- Memperbaiki tampilan kode pairing Sync Cloud agar langsung terlihat setelah
+  pendaftaran berhasil, tanpa bergantung pada status pengiriman transaksi.
+- Kode pairing tetap ditampilkan selama perangkat menunggu persetujuan; polling
+  status "belum dipasangkan" tidak lagi menghapus kode sebelum kedaluwarsa.
+- Memperbaiki pemetaan label status/kategori pada monitoring KDS dan mencegah
+  render ulang berulang pada antrean tiket KDS.
+- Memperbaiki pencetakan struk pada sebagian perangkat Android.
+
 ## v1.2.1-D
 
 Rilis perbaikan kedua dan penyempurnaan setelah v1.2.0. Berfokus pada stabilitas fitur lanjutan, pengalaman pengguna (search bar, dropdown, modal), diskon loyalty tier, kustomisasi resi, serta perbaikan import Excel dan backup.

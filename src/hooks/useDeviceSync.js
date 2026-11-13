@@ -37,6 +37,8 @@ function useDeviceSync({ toast_, isAdmin = true } = {}) {
 
   const pollRef = useRef(null);
   const credTimerRef = useRef(null);
+  const identityRef = useRef(null);
+  const pairingRef = useRef(null);
 
   const stopPolling = useCallback(() => {
     if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null; }
@@ -48,6 +50,7 @@ function useDeviceSync({ toast_, isAdmin = true } = {}) {
     try {
       const res = await api.deviceStatus();
       if (res?.ok) {
+        identityRef.current = res.identity || null;
         setIdentity(res.identity || null);
         setBaseUrlState(res.baseUrl || "");
         setPendingCount(Number(res.pendingCount) || 0);
@@ -108,16 +111,15 @@ function useDeviceSync({ toast_, isAdmin = true } = {}) {
     if (!available) return { ok: false };
     const res = await api.deviceCheckPairing();
     if (res?.ok) {
+      const wasRegistered = identityRef.current?.registered;
+      identityRef.current = res.identity || null;
       setIdentity(res.identity || null);
-      if (res.paired) {
-        stopPollingRef();
+      if (res.paired) stopPollingRef();
+      if (res.paired && pairingRef.current && !wasRegistered) {
+        pairingRef.current = null;
         setPairing(null);
         toast_?.("Perangkat berhasil dipasangkan", "ok");
         await refresh();
-      } else {
-        // Backend may revoke pairing independently of this app.
-        stopPollingRef();
-        setPairing(null);
       }
     }
     return res;
@@ -140,6 +142,7 @@ function useDeviceSync({ toast_, isAdmin = true } = {}) {
     pollRef.current = setInterval(() => {
       if (Date.now() - startedAt > POLL_MAX_MS) {
         stopPolling();
+        pairingRef.current = null;
         setPairing(null);
         toast_?.("Kode pairing kedaluwarsa. Minta kode baru.", "err");
         return;
@@ -154,8 +157,10 @@ function useDeviceSync({ toast_, isAdmin = true } = {}) {
     try {
       const res = await api.deviceRegister({ deviceName: identity?.deviceName });
       if (res?.ok && res.pairingCode) {
-        setPairing({ code: res.pairingCode, expiresAt: res.expiresAt, qrPayload: res.qrPayload });
-        startPolling();
+        const nextPairing = { code: res.pairingCode, expiresAt: res.expiresAt, qrPayload: res.qrPayload };
+        pairingRef.current = nextPairing;
+        setPairing(nextPairing);
+        if (!identityRef.current?.registered) startPolling();
         toast_?.("Kode pairing dibuat. Masukkan di Web-App.", "ok");
       } else {
         toast_(res?.error || "Gagal mendaftarkan perangkat", "err");
@@ -192,6 +197,7 @@ function useDeviceSync({ toast_, isAdmin = true } = {}) {
     try {
       const res = await api.deviceRotateCredential();
       if (res?.ok) {
+        pairingRef.current = null;
         setPairing(null);
         stopPolling();
         toast_?.("Kredensial diperbarui. Perangkat perlu dipasangkan ulang.", "ok");
