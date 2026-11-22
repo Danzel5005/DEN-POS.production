@@ -16,52 +16,41 @@ describe("reportHtml", () => {
 
   it("menghasilkan dokumen HTML A4 yang valid", () => {
     const html = buildReportHTML({
-      warungName: "Warung A",
       shiftLabel: "Semua Shift",
-      rev: 100000,
-      mod: 40000,
-      sub: 100000,
-      netProfit: 50000,
-      totalExpenses: 10000,
-      hasModal: true,
-      showCost: true,
-      transactions: [{}, {}],
+      cashier: "admin",
+      printedDay: "Minggu",
+      printedDate: "22 November 2026",
+      summary: {
+        methods: [{ key: "cash", label: "Tunai", amount: 100000, count: 2 }],
+        total: 100000,
+        trxCount: 2,
+        pax: 4,
+        avgPerPax: 25000,
+        avgPerTrx: 50000,
+      },
     });
     expect(html).toContain("<!DOCTYPE html>");
     expect(html).toContain("size: A4");
-    expect(html).toContain("Warung A");
-    expect(html).toContain("Total Modal");
-    expect(html).toContain("Laba Bersih");
+    expect(html).toContain("LAPORAN OMSET");
+    expect(html).toContain("Minggu");
+    expect(html).toContain("22 November 2026");
+    expect(html).toContain("admin");
+    expect(html).toContain("Tunai");
     expect(html).toContain("Rp 100.000");
-    expect(html).toContain("2 transaksi");
-  });
-
-  it("menyembunyikan modal & laba ketika showCost false", () => {
-    const html = buildReportHTML({ warungName: "W", showCost: false, hasModal: true });
+    expect(html).toContain("Total transaksi");
     expect(html).not.toContain("Total Modal");
     expect(html).not.toContain("Laba Bersih");
-    expect(html).toContain("Total Pendapatan");
-  });
-
-  it("menampilkan bagian analitik saat insights tersedia", () => {
-    const html = buildReportHTML({
-      warungName: "W",
-      insights: {
-        hasData: true,
-        busiest: { hour: 19, count: 5 },
-        average: { average: 25000 },
-        mix: [{ key: "cash", label: "Tunai", count: 3, revenue: 90000 }],
-        top: [{ nama: "Kopi", qty: 10, revenue: 50000 }],
-      },
-    });
-    expect(html).toContain("Analitik Penjualan");
-    expect(html).toContain("19:00");
-    expect(html).toContain("Tunai");
-    expect(html).toContain("Kopi");
-  });
-
-  it("melewatkan analitik ketika hasData false", () => {
-    const html = buildReportHTML({ warungName: "W", insights: { hasData: false } });
     expect(html).not.toContain("Analitik Penjualan");
+  });
+
+  it("escape semua data dinamis", () => {
+    const html = buildReportHTML({
+      shiftLabel: "<b>shift</b>",
+      cashier: 'admin"><script>',
+      summary: { methods: [{ key: "x", label: "<QR>", amount: 0, count: 1 }], total: 0, trxCount: 0, pax: 0, avgPerPax: 0, avgPerTrx: 0 },
+    });
+    expect(html).not.toContain("<b>shift</b>");
+    expect(html).not.toContain("<script>");
+    expect(html).toContain("&lt;QR&gt;");
   });
 });

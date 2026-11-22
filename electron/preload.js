@@ -80,6 +80,7 @@ settleTrx: (id, actor) => ipcRenderer.invoke("trx-settle", id, actor),
   // Printer
   getPrinters:   ()    => ipcRenderer.invoke("get-printers"),
   printReceiptEscPos: (data) => ipcRenderer.invoke("print-receipt-escpos", data),
+  printReportEscPos: (data) => ipcRenderer.invoke("print-report-escpos", data),
   printReceipt:  (data)=> ipcRenderer.invoke("print-receipt", data),
     exportReportPdf: (data)=>ipcRenderer.invoke("export-report-pdf", data),
   // Shifts

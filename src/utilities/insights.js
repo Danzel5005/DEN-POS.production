@@ -68,6 +68,41 @@ function paymentMix(transactions = [], labelOf = (k) => k) {
   return [...map.values()].sort((a, b) => b.revenue - a.revenue);
 }
 
+// Ringkasan omset tunggal untuk PDF dan cetak thermal.
+// Basis penjualan adalah t.total, bukan jumlah yang dibayar.
+function buildOmsetSummary(transactions = [], { labelOf = (k) => k } = {}) {
+  const methodsMap = new Map();
+  let total = 0;
+  let trxCount = 0;
+  let pax = 0;
+
+  for (const trx of Array.isArray(transactions) ? transactions : []) {
+    if (isVoided(trx)) continue;
+    const amount = Number(trx?.total || 0);
+    const key = String(trx?.metodeBayar || "cash").trim() || "cash";
+    const entry = methodsMap.get(key) || { key, label: labelOf(key), amount: 0, count: 0 };
+    entry.amount += amount;
+    entry.count += 1;
+    methodsMap.set(key, entry);
+    total += amount;
+    trxCount += 1;
+    pax += Math.max(0, Math.floor(Number(trx?.pax) || 0));
+  }
+
+  const methods = [...methodsMap.values()].sort((a, b) =>
+    b.amount - a.amount || a.label.localeCompare(b.label, "id")
+  );
+
+  return {
+    methods,
+    total,
+    trxCount,
+    pax,
+    avgPerPax: pax > 0 ? total / pax : 0,
+    avgPerTrx: trxCount > 0 ? total / trxCount : 0,
+  };
+}
+
 // topItems — item terlaris berdasarkan qty, dengan pendapatan.
 function topItems(transactions = [], limit = 5) {
   const map = new Map();
@@ -100,4 +135,4 @@ function buildInsights(transactions = [], { labelOf } = {}) {
   };
 }
 
-export { peakHours, averageOrder, paymentMix, topItems, buildInsights };
+export { peakHours, averageOrder, paymentMix, buildOmsetSummary, topItems, buildInsights };

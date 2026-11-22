@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { averageOrder, buildInsights, paymentMix, peakHours, topItems } from "./insights.js";
+import { averageOrder, buildInsights, buildOmsetSummary, paymentMix, peakHours, topItems } from "./insights.js";
 
 // Transaksi minimal dengan bentuk yang sama seperti dari useCart.processPayment.
 const trx = (over = {}) => ({
@@ -105,5 +105,49 @@ describe("insights.buildInsights", () => {
     expect(result.average.count).toBe(1);
     expect(result.mix[0].label).toBe("Tunai");
     expect(result.top[0].nama).toBe("Kopi");
+  });
+});
+
+describe("insights.buildOmsetSummary", () => {
+  const labelOf = (key) => ({ cash: "Tunai", qris: "QRIS BCA", debit: "Debit" })[key] || key;
+
+  it("groups used methods, sorts by amount, and totals pax", () => {
+    const summary = buildOmsetSummary([
+      trx({ id: "a", metodeBayar: "cash", total: 30000, pax: 2 }),
+      trx({ id: "b", metodeBayar: "qris", total: 50000, pax: 3 }),
+      trx({ id: "c", metodeBayar: "cash", total: 20000, pax: 1 }),
+    ], { labelOf });
+
+    expect(summary.methods.map((method) => method.key)).toEqual(["qris", "cash"]);
+    expect(summary.methods[0]).toMatchObject({ label: "QRIS BCA", amount: 50000, count: 1 });
+    expect(summary.methods[1]).toMatchObject({ label: "Tunai", amount: 50000, count: 2 });
+    expect(summary.total).toBe(100000);
+    expect(summary.trxCount).toBe(3);
+    expect(summary.pax).toBe(6);
+    expect(summary.avgPerPax).toBeCloseTo(16666.6667);
+    expect(summary.avgPerTrx).toBeCloseTo(33333.3333);
+  });
+
+  it("handles zero pax and empty transactions", () => {
+    expect(buildOmsetSummary([], { labelOf })).toEqual({
+      methods: [],
+      total: 0,
+      trxCount: 0,
+      pax: 0,
+      avgPerPax: 0,
+      avgPerTrx: 0,
+    });
+    const summary = buildOmsetSummary([trx({ total: 25000, pax: undefined })], { labelOf });
+    expect(summary.pax).toBe(0);
+    expect(summary.avgPerPax).toBe(0);
+  });
+
+  it("excludes voided transactions and keeps method sum equal to total", () => {
+    const summary = buildOmsetSummary([
+      trx({ id: "a", metodeBayar: "cash", total: 40000, pax: 2 }),
+      trx({ id: "b", metodeBayar: "qris", total: 90000, pax: 4, status: "voided" }),
+    ], { labelOf });
+    expect(summary.trxCount).toBe(1);
+    expect(summary.methods.reduce((sum, method) => sum + method.amount, 0)).toBe(summary.total);
   });
 });

@@ -8,6 +8,7 @@ import LoginScreen from "./screens/LoginScreen.jsx";
 import Header from "./screens/Workspace/Header.jsx";
 import ModalStack from "./screens/Workspace/ModalStack.jsx";
 import RestockInbox from "./components/RestockInbox.jsx";
+import ConfirmationModal from "./components/modals/ConfirmationModal.jsx";
 
 import { useToast } from "./hooks/useToast.js";
 import { syncShiftAttendance } from "./utilities/shiftAttendance.js";
@@ -195,6 +196,9 @@ function KasirWorkspace() {
   // harus tahu tentang domain lain (melanggar constraint "no cross-hook
   // import") — jadi dia tinggal di coordinator level.
   const [confirmDel, setConfirmDel] = useState(null);
+  const [confirmState, setConfirmState] = useState(null);
+  const askConfirm = useCallback((message) => new Promise((res) => setConfirmState({ message, res })), []);
+  const closeConfirm = (v) => { confirmState?.res(v); setConfirmState(null); };
   const [closeShiftWarning, setCloseShiftWarning] = useState([]);
 
   // ── Snake loader state for button actions
@@ -347,7 +351,7 @@ function KasirWorkspace() {
     };
 
     if (duplicate) {
-      const addToExisting = window.confirm(`Nomor table ${table} sudah ada, apakah ingin menambahkan item ini pada nomor table tersebut?`);
+      const addToExisting = await askConfirm(`Nomor table ${table} sudah ada, apakah ingin menambahkan item ini pada nomor table tersebut?`);
       if (addToExisting) {
         const saved = await cartH.saveOpenBill({ ...options, mergeBillId: duplicate.id });
         if (saved) {
@@ -357,7 +361,7 @@ function KasirWorkspace() {
         return saved;
       }
 
-      if (!window.confirm("Apakah ingin membuat openbill baru?")) return false;
+      if (!await askConfirm("Apakah ingin membuat openbill baru?")) return false;
       cartH.setActiveBill(null);
       cartH.setTableNumber("");
       cartH.setDrawerOpen(true);
@@ -366,7 +370,7 @@ function KasirWorkspace() {
     }
 
     return cartH.saveOpenBill(options);
-  }, [cartH.saveOpenBill, cartH.tableNumber, cartH.activeBill, cartH.setActiveBill, cartH.setTableNumber, cartH.setDrawerOpen, billsH.bills, billsH.billId, billsH.persistBills, billsH.setBillId, menuH.applyStockView, customersH.selectedCustomer, customersH.setSelectedCustomerId, settingsH.settings.receiptPaxEnabled, settingsH.settings.receiptTableEnabled, toastH.toast_]);
+  }, [cartH.saveOpenBill, cartH.tableNumber, cartH.activeBill, cartH.setActiveBill, cartH.setTableNumber, cartH.setDrawerOpen, billsH.bills, billsH.billId, billsH.persistBills, billsH.setBillId, menuH.applyStockView, customersH.selectedCustomer, customersH.setSelectedCustomerId, settingsH.settings.receiptPaxEnabled, settingsH.settings.receiptTableEnabled, toastH.toast_, askConfirm]);
 
   // processPayment butuh potongan dari useHistory, useMenu, useAuth, useBills
   // FIX: Use cartH.activeBill?.id directly to avoid race condition with setTimeout
@@ -617,6 +621,7 @@ const executeConfirmDel = useCallback((restoreStock = false) => {
             totalExpenses={totalExpenses}
             onOpenExpenseModal={() => setExpenseModal(true)}
             onOpenCashModal={() => setOpeningCashModal(true)} advancedFeatures={settingsH.settings.advancedFeatures} isAdvancedActive={settingsH.isAdvancedActive} receiptPaxEnabled={settingsH.settings.receiptPaxEnabled === true} warungName={settingsH.settings.warungName} warungAddress={settingsH.settings.warungAddress} warungPhone={settingsH.settings.warungPhone} currentUser={authH.currentUser} toast_={toastH.toast_}
+              printerName={settingsH.settings.printerName} receiptPaperWidthMm={settingsH.settings.receiptPaperWidthMm} printHTML={settingsH.printHTML}
               advancedData={advDataH} />
         )}
 
@@ -691,6 +696,12 @@ const executeConfirmDel = useCallback((restoreStock = false) => {
         toastH={toastH}
         updateInfo={updateInfo}
         setUpdateInfo={setUpdateInfo}
+      />
+      <ConfirmationModal
+        isOpen={!!confirmState}
+        message={confirmState?.message}
+        onConfirm={() => closeConfirm(true)}
+        onCancel={() => closeConfirm(false)}
       />
     </div>
     );

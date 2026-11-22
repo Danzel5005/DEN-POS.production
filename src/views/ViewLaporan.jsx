@@ -4,11 +4,12 @@ import { fmt, fmtNum } from "../utilities/receipt.js";
 import { METODE_LABELS } from "../constants/payments.js";
 import { G, OR, W, LT, BD, TX, MT, METODE_COLORS } from "../constants/design.js";
 import { isVoided, api } from "../utilities/utils.js";
-import { buildInsights } from "../utilities/insights.js";
+import { buildInsights, buildOmsetSummary } from "../utilities/insights.js";
 import { buildCashFlow } from "../utilities/cashflow.js";
 import { buildReportHTML } from "../utilities/reportHtml.js";
 import CashFlowShifts from "../components/CashFlowShifts.jsx";
 import { sortShiftsActiveFirst } from "../utilities/shiftState.js";
+import { getPrinterSelectionStatus } from "../utilities/printer.js";
 
 function AttendanceReportSection({ toast_ }) {
   const [rows, setRows] = useState([]);
@@ -53,7 +54,9 @@ function ViewLaporan({
   openingCash = 0,
   totalExpenses = 0,
   onOpenExpenseModal,
-  onOpenCashModal, advancedFeatures, isAdvancedActive, receiptPaxEnabled = false, warungName, warungAddress, warungPhone, currentUser, toast_, advancedData, }) {
+  onOpenCashModal, advancedFeatures, isAdvancedActive, receiptPaxEnabled = false, warungName, warungAddress, warungPhone, currentUser, toast_, advancedData,
+  printerName = "", receiptPaperWidthMm = 80, printHTML,
+}) {
   const selShift = shifts.find(s=>s.id===selectedShiftId) || activeShift;
   const reportShiftId = selectedShiftId === "all" ? undefined : selectedShiftId || activeShift?.id;
   const [shiftTrx, setShiftTrx] = useState([]);
@@ -133,22 +136,27 @@ const rev=shiftTrx.reduce((s,t)=>s+paidOf(t),0);
     return METODE_LABELS[k] || k;
   };
   const insights = showInsights ? buildInsights(shiftTrx, { labelOf }) : null;
+  const omsetSummary = buildOmsetSummary(shiftTrx, { labelOf });
   const [isExportingPdf, setIsExportingPdf] = useState(false);
+  const [isPrintingReport, setIsPrintingReport] = useState(false);
+  const getPrintedDateParts = () => {
+    const now = new Date();
+    return {
+      printedDay: new Intl.DateTimeFormat("id-ID", { weekday: "long" }).format(now),
+      printedDate: new Intl.DateTimeFormat("id-ID", { day: "numeric", month: "long", year: "numeric" }).format(now),
+    };
+  };
   const handleExportPdf = async () => {
     if (isExportingPdf) return;
     setIsExportingPdf(true);
     try {
+      const { printedDay, printedDate } = getPrintedDateParts();
       const html = buildReportHTML({
-        warungName,
-        warungAddress,
-        warungPhone,
         shiftLabel,
-        generatedAt: new Date().toLocaleString("id-ID"),
-        rev, mod, sub, netProfit, totalExpenses: reportTotalExpenses,
-                hasModal,
-        showCost: canViewCost,
-        hppResep: showResepHpp && hasHppResep ? { total: hppResep, missing: resepMissingCount.n } : null,
-        insights, transactions: shiftTrx,
+        cashier: currentUser?.username || "",
+        printedDay,
+        printedDate,
+        summary: omsetSummary,
       });
       const safeShift = String(shiftLabel || "laporan").replace(/[^a-zA-Z0-9]+/g, "-");
       const res = await api.exportReportPdf({ html, defaultName: `Laporan-${safeShift}.pdf` });
@@ -161,6 +169,50 @@ const rev=shiftTrx.reduce((s,t)=>s+paidOf(t),0);
       (toast_ || (() => {}))(err.message || "Gagal menyimpan PDF", "err");
     } finally {
       setIsExportingPdf(false);
+    }
+  };
+  const handlePrintReport = async () => {
+    if (isPrintingReport) return;
+    if (!printerName) {
+      toast_?.("Pilih printer di Pengaturan Printer", "err");
+      return;
+    }
+    setIsPrintingReport(true);
+    try {
+      const selection = getPrinterSelectionStatus(printerName);
+      const { printedDay, printedDate } = getPrintedDateParts();
+      if (selection.isThermal) {
+        const result = await api.printReportEscPos({
+          summary: omsetSummary,
+          shiftLabel,
+          printedDay,
+          printedDate,
+          cashier: currentUser?.username || "",
+          printerName,
+          paperWidthMm: receiptPaperWidthMm,
+        });
+        if (result?.ok) toast_?.("Laporan berhasil dicetak", "ok");
+        else toast_?.(result?.error || "Gagal mencetak laporan", "err");
+      } else if (selection.isPdf) {
+        await handleExportPdf();
+      } else {
+        const html = buildReportHTML({
+          shiftLabel,
+          cashier: currentUser?.username || "",
+          printedDay,
+          printedDate,
+          summary: omsetSummary,
+        });
+        if (typeof printHTML === "function") {
+          await printHTML(html, "Laporan berhasil dicetak");
+        } else {
+          toast_?.("Gagal mencetak laporan", "err");
+        }
+      }
+    } catch (err) {
+      toast_?.(err?.message || "Gagal mencetak laporan", "err");
+    } finally {
+      setIsPrintingReport(false);
     }
   };
   const [detailType, setDetailType] = useState(null);
@@ -288,14 +340,24 @@ const rev=shiftTrx.reduce((s,t)=>s+paidOf(t),0);
             Masukan Pengeluaran
           </button>        
         {showPdfReport && (
-          <button
-            type="button"
-            onClick={handleExportPdf}
-            disabled={isExportingPdf}
-            style={{padding:"8px 12px",background:G,color:"#fff",border:`1px solid ${G}`,borderRadius:8,cursor:isExportingPdf?"wait":"pointer",fontFamily:"inherit",fontSize:12,fontWeight:700,opacity:isExportingPdf?0.7:1}}
-          >
-            {isExportingPdf ? "Menyiapkan..." : "Ekspor PDF"}
-          </button>
+          <>
+            <button
+              type="button"
+              onClick={handleExportPdf}
+              disabled={isExportingPdf || isPrintingReport}
+              style={{padding:"8px 12px",background:G,color:"#fff",border:`1px solid ${G}`,borderRadius:8,cursor:isExportingPdf?"wait":"pointer",fontFamily:"inherit",fontSize:12,fontWeight:700,opacity:isExportingPdf?0.7:1}}
+            >
+              {isExportingPdf ? "Menyiapkan..." : "Ekspor PDF"}
+            </button>
+            <button
+              type="button"
+              onClick={handlePrintReport}
+              disabled={isPrintingReport || isExportingPdf}
+              style={{padding:"8px 12px",background:W,color:G,border:`1px solid ${G}`,borderRadius:8,cursor:isPrintingReport?"wait":"pointer",fontFamily:"inherit",fontSize:12,fontWeight:700,opacity:isPrintingReport?0.7:1}}
+            >
+              {isPrintingReport ? "Mencetak..." : "Cetak Laporan"}
+            </button>
+          </>
         )}
         </div>
       </div>

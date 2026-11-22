@@ -64,6 +64,9 @@
 
 ## 🧪 Functional Testing (Ready to Test)
 
+### Open Bill Duplicate Table Regression
+- [ ] Buat 2 Open Bill dengan nomor table sama, pilih Tidak lalu buat baru; pastikan input Table dan Pelanggan tetap bisa diketik tanpa membuka devtools.
+
 ### Test 1: Add Drinks Tag to Category
 **Expected Flow**:
 1. Open "Kelola Menu & Kategori" → "Kelola Kategori"

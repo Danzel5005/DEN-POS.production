@@ -346,6 +346,7 @@ async deleteTrx(id, opts) {
   async backupRelaunch()  { return window.kasirAPI?.backupRelaunch ? safeIpc("Muat ulang aplikasi", () => window.kasirAPI.backupRelaunch()) : { ok:false, error:"Hanya tersedia di aplikasi desktop" }; },
   async getPrinters()     { return window.kasirAPI ? await window.kasirAPI.getPrinters()      : []; },
   async printReceipt(d)   { return window.kasirAPI ? await window.kasirAPI.printReceipt(d)    : {ok:false,error:"Hanya tersedia di aplikasi desktop"}; },
+  async printReportEscPos(d) { return window.kasirAPI ? await window.kasirAPI.printReportEscPos(d) : {ok:false,error:"Hanya tersedia di aplikasi desktop"}; },
 
   async exportReportPdf(d) { return (window.kasirAPI) ? await window.kasirAPI.exportReportPdf(d) : { ok: false, error: "Hanya tersedia aplikasi desktop" }; },
   async loadShifts()      { return window.kasirAPI ? await window.kasirAPI.loadShifts?.()     : (LS("ykk_shifts")||[]); },

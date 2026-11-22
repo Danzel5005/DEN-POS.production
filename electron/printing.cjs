@@ -91,6 +91,76 @@ function createPrintingService({ app, ipcMain, BrowserWindow, dialog, dataDir, e
     return "";
   };
   const kvLine = (printer, label, value) => printer.leftRight(label, value);
+  const wrapText = (text, width) => {
+    const words = String(text || "").trim().split(/\s+/).filter(Boolean);
+    if (!words.length) return [""];
+    const lines = [];
+    let line = "";
+    for (const word of words) {
+      const candidate = line ? `${line} ${word}` : word;
+      if (candidate.length <= width) {
+        line = candidate;
+      } else {
+        if (line) lines.push(line);
+        if (word.length <= width) line = word;
+        else {
+          for (let i = 0; i < word.length; i += width) lines.push(word.slice(i, i + width));
+          line = "";
+        }
+      }
+    }
+    if (line) lines.push(line);
+    return lines;
+  };
+  const buildEscPosOmsetReport = (printer, summary, shiftLabel, printedDay, printedDate, cashier, cols) => {
+    printer.alignCenter();
+    printer.bold(true);
+    printer.setTextDoubleHeight();
+    printer.println("LAPORAN OMSET");
+    printer.setTextNormal();
+    printer.resetLineSpacing();
+    printer.bold(false);
+    printer.alignLeft();
+    kvLine(printer, "Hari", printedDay);
+    kvLine(printer, "Tanggal", printedDate);
+    kvLine(printer, "Kasir", cashier);
+    for (const line of wrapText(shiftLabel, cols)) {
+      printer.println(line);
+    }
+    printer.drawLine();
+    printer.bold(true);
+    printer.println("Metode Pembayaran");
+    printer.bold(false);
+    const methods = Array.isArray(summary?.methods) ? summary.methods : [];
+    if (!methods.length) {
+      kvLine(printer, "-", fmtRp(0));
+    } else {
+      for (const method of methods) {
+        const amount = fmtRp(method.amount);
+        const labelWidth = Math.max(8, cols - amount.length - 2);
+        const labelLines = wrapText(method.label || method.key || "-", labelWidth);
+        labelLines.forEach((label, index) => {
+          if (index === labelLines.length - 1) kvLine(printer, label, amount);
+          else printer.println(label);
+        });
+      }
+    }
+    printer.drawLine();
+    printer.bold(true);
+    kvLine(printer, "Total", fmtRp(summary?.total));
+    printer.bold(false);
+    printer.drawLine();
+    kvLine(printer, "Total transaksi", String(Number(summary?.trxCount || 0)));
+    kvLine(printer, "Total Pax", String(Number(summary?.pax || 0)));
+    kvLine(printer, "Rata-Rata/Pax", fmtRp(summary?.avgPerPax));
+    kvLine(printer, "Rata-Rata/Transaksi", fmtRp(summary?.avgPerTrx));
+    printer.drawLine();
+    printer.alignCenter();
+    printer.println(`Hari cetak : ${printedDay}`);
+    printer.println(`Tanggal cetak : ${printedDate}`);
+    printer.println(`Kasir mencetak : ${cashier}`);
+    printer.cut();
+  };
   const buildEscPosReceipt = (printer, trx, warungName, warungAddress, warungPhone, operatorName, cats = [], customerEnabled = true, receiptAdditionals = []) => {
     const storeName = warungName || trx.warungName || "Warung";
     printer.alignCenter(); printer.bold(true); printer.setTextDoubleHeight(); printer.println(storeName); printer.setTextNormal(); printer.resetLineSpacing(); printer.bold(false);
@@ -182,6 +252,25 @@ ipcMain.handle("print-receipt-escpos", async (_e, { trx, printerName, paperWidth
       console.log("[ESC/POS] Print successful to:", selectedName);
       return { ok: true };
     } catch (err) { const message = err?.message || String(err); console.error("[ESC/POS] Print failed for:", selectedName, message); const looksHardware = /not found|not connected|timeout|offline|printer|device/i.test(message); return { ok: false, error: looksHardware ? `Printer tidak ditemukan 404: "${selectedName}" tidak terhubung. Pastikan printer terhubung dan driver terinstall.` : message }; }
+  });
+
+  ipcMain.handle("print-report-escpos", async (_e, { summary, shiftLabel, printedDay, printedDate, cashier, printerName, paperWidthMm }) => {
+    const selectedName = printerName || "auto";
+    try {
+      const paperW = normalizePaperWidthMm(paperWidthMm);
+      if (!selectedName || /pdf/i.test(selectedName)) return { ok: false, error: "Printer yang dipilih bukan printer thermal. Pilih printer thermal fisik atau gunakan printer sistem/PDF." };
+      const printer = new ThermalPrinter({ type: PrinterTypes.EPSON, interface: selectedName === "auto" ? "printer:auto" : `printer:${selectedName}`, ...(nodePrinterDriver ? { driver: nodePrinterDriver } : {}), width: charsPerLineForWidth(paperW), removeSpecialCharacters: false, options: { timeout: 5000 } });
+      if (!await printer.isPrinterConnected()) return { ok: false, error: `Printer tidak ditemukan 404: "${selectedName}" tidak terhubung. Pastikan printer terhubung dan driver terinstall.` };
+      buildEscPosOmsetReport(printer, summary, shiftLabel || "Semua Shift", printedDay || "", printedDate || "", cashier || "", charsPerLineForWidth(paperW));
+      await printer.execute();
+      console.log("[ESC/POS] Omset report print successful to:", selectedName);
+      return { ok: true };
+    } catch (err) {
+      const message = err?.message || String(err);
+      console.error("[ESC/POS] Omset report print failed for:", selectedName, message);
+      const looksHardware = /not found|not connected|timeout|offline|printer|device/i.test(message);
+      return { ok: false, error: looksHardware ? `Printer tidak ditemukan 404: "${selectedName}" tidak terhubung. Pastikan printer terhubung dan driver terinstall.` : message };
+    }
   });
 }
 

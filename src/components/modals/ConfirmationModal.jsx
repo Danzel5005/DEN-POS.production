@@ -1,5 +1,5 @@
 import { useCallback, useEffect } from "react";
-import { G, W, BD, MT, RADIUS, TYPOGRAPHY, COLOR_PALETTE } from "../constants/design.js";
+import { G, W, BD, MT, TX, LT, RADIUS, TYPOGRAPHY, COLOR_PALETTE } from "../../constants/design.js";
 
 function ConfirmationModal({ isOpen, onConfirm, onCancel, title, message, confirmText = "Ya", cancelText = "Tidak" }) {
   useEffect(() => {
