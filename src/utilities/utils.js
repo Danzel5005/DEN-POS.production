@@ -356,22 +356,36 @@ async deleteTrx(id, opts) {
     if(window.kasirAPI) return window.kasirAPI.processPayment(data);
     // Fallback localStorage (dev browser mode)
     const { trx, activeBillId } = data;
-    const a = LS("ykk_trx")||[]; a.unshift(trx); LS("ykk_trx", a);
+    const a = LS("ykk_trx")||[];
+    const match = /^TRX-(\d{6})\d+$/.exec(String(trx?.id || ""));
+    let savedTrx = trx;
+    if (match) {
+      const prefix = `TRX-${match[1]}`;
+      const maxSequence = a.reduce((max, item) => {
+        const id = String(item?.id || "");
+        const suffix = id.startsWith(prefix) ? id.slice(prefix.length) : "";
+        return /^\d+$/.test(suffix) ? Math.max(max, Number(suffix)) : max;
+      }, 0);
+      const id = `${prefix}${maxSequence + 1}`;
+      savedTrx = { ...trx, id };
+      if (trx.kdsSourceRef === trx.id) savedTrx.kdsSourceRef = id;
+    }
+    a.unshift(savedTrx); LS("ykk_trx", a);
     if(activeBillId) LS("ykk_bills", (LS("ykk_bills")||[]).filter(b=>b.id!==activeBillId));
     // Potong stok kalau bukan dari open bill (stok sudah dipotong saat hold).
     const stock = {};
-    if(!activeBillId && Array.isArray(trx?.items)) {
+    if(!activeBillId && Array.isArray(savedTrx?.items)) {
       const deltas = {};
-      trx.items.forEach(it => {
+      savedTrx.items.forEach(it => {
         if(it?.id === undefined || it?.id === null) return;
         const qty = Number(it.baseQty ?? it.qty) || 0;
         if(!qty) return;
         deltas[String(it.id)] = (deltas[String(it.id)] || 0) - qty;
       });
-      const r = await this.applyStock(deltas, { type: "sale", ref: trx?.id });
+      const r = await this.applyStock(deltas, { type: "sale", ref: savedTrx?.id });
       Object.assign(stock, r?.stock || {});
     }
-    return { ok: true, stock };
+    return { ok: true, stock, trx: savedTrx };
   },
   // ── Device identity & cloud sync (PLAN-WEBSYNC) ────────────────────────────
   // Desktop-only. Di browser semua mengembalikan { ok:false } agar UI bisa

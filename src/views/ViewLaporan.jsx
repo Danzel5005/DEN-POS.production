@@ -388,6 +388,10 @@ const rev=shiftTrx.reduce((s,t)=>s+paidOf(t),0);
       <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(170px,1fr))",gap:10,marginBottom:20}}>
         {[
           {l:"Total Pendapatan",v:fmt(rev),c:G,s:`dari ${shiftTrx.length} trx`,key:"income"},
+          {l:"Hasil Bersih",v:fmt(omsetSummary.netSubtotal),c:"#1a5fb4",s:"akumulasi subtotal transaksi",key:"net-subtotal"},
+          {l:"Total Diskon",v:fmt(omsetSummary.discount),c:"#b87a00",s:"akumulasi diskon transaksi",key:"discount"},
+          {l:"Total Biaya Service",v:fmt(omsetSummary.service),c:"#1a5fb4",s:"akumulasi service transaksi",key:"service"},
+          {l:"Total Biaya Pajak",v:fmt(omsetSummary.pajak),c:"#1a5fb4",s:"akumulasi pajak transaksi",key:"tax"},
           {l:"Total Pengeluaran",v:fmt(reportTotalExpenses),c:"#e84040",s:`${(selShift?.expenses || []).length || 0} catatan`,key:"expense"},
           {l:"Total Modal",v:hasModal?fmt(mod):"Belum diinput",c:"#b87a00",s:hasModal?`dari sub ${fmt(sub)}`:"-",key:"modal"},
           {l:"Laba Bersih",v:fmt(netProfit),c:netProfit>=0?G:"#e84040",s:hasModal?`margin ${sub>0?((netProfit/(sub||1))*100).toFixed(1):0}%`:"-",key:"profit"},
@@ -623,7 +627,7 @@ const rev=shiftTrx.reduce((s,t)=>s+paidOf(t),0);
               fn:()=>doCSV(`Sales_Rate_${selectedShiftId==="all"?"Semua":`Shift${selShift?.shiftNum||""}`}`,
                 csvSalesRate(shiftTrx,menu,at()))},
           {title:"Sales Report",
-            desc:"Total qty, pendapatan, modal, laba, dan margin % untuk setiap item.",
+            desc:"Total qty, pendapatan, modal, laba, margin %, serta biaya service dan pajak transaksi.",
             btn:"Unduh CSV Per Item",
             fn:()=>doCSV(`Rangkuman_Per_Menu_${selectedShiftId==="all"?"Semua":`Shift${selShift?.shiftNum||""}`}`,
               csvPerMenu(shiftTrx,menu,at(), menuH?.cats || []))},

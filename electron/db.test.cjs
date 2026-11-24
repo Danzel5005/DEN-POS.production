@@ -109,6 +109,13 @@ class FakeDatabase {
       return syncedNull[1] ? !isNullValue : isNullValue;
     }
 
+    const like = /^(.+?)\s+LIKE\s+\?$/i.exec(cond);
+    if (like) {
+      const value = this._value(row, like[1]);
+      const pattern = String(this._lastParams?.[this._popped++] ?? "");
+      return pattern.endsWith("%") && String(value).startsWith(pattern.slice(0, -1));
+    }
+
     const cmp = /^(.+?)\s*(>=|<=|!=|=)\s*(\?|\d+|'[^']*')$/i.exec(cond);
     if (cmp) {
       const left = this._value(row, cmp[1]);
@@ -787,6 +794,54 @@ describe("db.cjs: process-payment", () => {
     expect(fs.existsSync(files.trx)).toBe(true);
     expect(JSON.parse(fs.readFileSync(files.trx, "utf-8")).map((t) => t.id)).toEqual(["p2"]);
     expect(JSON.parse(fs.readFileSync(files.bills, "utf-8")).map((b) => b.id)).toEqual(["bill-9"]);
+  });
+
+  it("alokasi ID mengabaikan created_at transaksi hasil migrasi", () => {
+    const restored = { id: "TRX-0101991", timestamp: "1998-12-31T17:00:00.000Z", total: 10 };
+    fs.writeFileSync(files.trx, JSON.stringify([restored]), "utf-8");
+    services.svc.initDB();
+    services.svc.registerHandlers();
+    services.svc.migrateJSONToSQLite();
+    const migratedRow = FakeBetterSqlite3.instances.at(-1).tables.transactions.find((row) => row.id === restored.id);
+    migratedRow.created_at = "1999-01-02 00:00:00";
+    expect(migratedRow.created_at.slice(0, 10)).not.toBe("1999-01-01");
+
+    const res = call("process-payment", {
+      trx: { ...restored, id: "TRX-0101991", kdsSourceRef: "TRX-0101991" },
+    });
+
+    expect(res.trx.id).toBe("TRX-0101992");
+    expect(res.trx.kdsSourceRef).toBe("TRX-0101992");
+  });
+
+  it("checkout memakai suffix tertinggi setelah transaksi tengah dihapus", () => {
+    services.svc.initDB();
+    services.svc.registerHandlers();
+    call("trx-save", { id: "TRX-0201261" });
+    call("trx-save", { id: "TRX-0201262" });
+    call("trx-save", { id: "TRX-0201263" });
+    call("trx-delete", "TRX-0201262");
+
+    const res = call("process-payment", { trx: { id: "TRX-0201263" } });
+
+    expect(res.trx.id).toBe("TRX-0201264");
+  });
+
+  it("checkout tidak bentrok dengan transaksi pukul 00:00 WIB", () => {
+    services.svc.initDB();
+    services.svc.registerHandlers();
+    call("trx-save", {
+      id: "TRX-2401261",
+      timestamp: "2026-01-23T17:00:00.000Z",
+    });
+    // 17:00 UTC is 00:00 WIB; SQLite's UTC date is still the previous day.
+    FakeBetterSqlite3.instances.at(-1).tables.transactions[0].created_at = "2026-01-23 17:00:00";
+
+    const res = call("process-payment", {
+      trx: { id: "TRX-2401261", timestamp: "2026-01-24T05:00:00.000Z" },
+    });
+
+    expect(res.trx.id).toBe("TRX-2401262");
   });
 });
 

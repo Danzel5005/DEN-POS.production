@@ -226,6 +226,18 @@ describe("utils.js - LocalStorage Helper (LS) & API Wrapper", () => {
       expect(menu[0].stok).toBe(9);
     });
 
+    it("allocates browser checkout IDs from stored transaction IDs", async () => {
+      LS("ykk_trx", [{ id: "TRX-2411261" }, { id: "TRX-2411263" }]);
+
+      const result = await api.processPayment({
+        trx: { id: "TRX-2411261", kdsSourceRef: "TRX-2411261" },
+      });
+
+      expect(result.trx.id).toBe("TRX-2411264");
+      expect(result.trx.kdsSourceRef).toBe("TRX-2411264");
+      expect((await api.loadTrx())[0].id).toBe("TRX-2411264");
+    });
+
     it("should load default settings and handle save settings", async () => {
       const defaultSettings = await api.loadSettings();
       expect(defaultSettings).toEqual({});

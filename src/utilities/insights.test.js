@@ -113,15 +113,18 @@ describe("insights.buildOmsetSummary", () => {
 
   it("groups used methods, sorts by amount, and totals pax", () => {
     const summary = buildOmsetSummary([
-      trx({ id: "a", metodeBayar: "cash", total: 30000, pax: 2 }),
-      trx({ id: "b", metodeBayar: "qris", total: 50000, pax: 3 }),
-      trx({ id: "c", metodeBayar: "cash", total: 20000, pax: 1 }),
+      trx({ id: "a", metodeBayar: "cash", total: 30000, subtotal: 30000, pax: 2 }),
+      trx({ id: "b", metodeBayar: "qris", total: 50000, subtotal: 50000, pax: 3 }),
+      trx({ id: "c", metodeBayar: "cash", total: 20000, subtotal: 20000, pax: 1 }),
     ], { labelOf });
 
     expect(summary.methods.map((method) => method.key)).toEqual(["qris", "cash"]);
     expect(summary.methods[0]).toMatchObject({ label: "QRIS BCA", amount: 50000, count: 1 });
     expect(summary.methods[1]).toMatchObject({ label: "Tunai", amount: 50000, count: 2 });
     expect(summary.total).toBe(100000);
+    expect(summary.netSubtotal).toBe(100000);
+    expect(summary.service).toBe(0);
+    expect(summary.pajak).toBe(0);
     expect(summary.trxCount).toBe(3);
     expect(summary.pax).toBe(6);
     expect(summary.avgPerPax).toBeCloseTo(16666.6667);
@@ -132,6 +135,10 @@ describe("insights.buildOmsetSummary", () => {
     expect(buildOmsetSummary([], { labelOf })).toEqual({
       methods: [],
       total: 0,
+      netSubtotal: 0,
+      discount: 0,
+      service: 0,
+      pajak: 0,
       trxCount: 0,
       pax: 0,
       avgPerPax: 0,
@@ -144,10 +151,14 @@ describe("insights.buildOmsetSummary", () => {
 
   it("excludes voided transactions and keeps method sum equal to total", () => {
     const summary = buildOmsetSummary([
-      trx({ id: "a", metodeBayar: "cash", total: 40000, pax: 2 }),
-      trx({ id: "b", metodeBayar: "qris", total: 90000, pax: 4, status: "voided" }),
+      trx({ id: "a", metodeBayar: "cash", total: 40000, subtotal: 35000, discount: 5000, service: 1750, pajak: 3675, pax: 2 }),
+      trx({ id: "b", metodeBayar: "qris", total: 90000, subtotal: 80000, discount: 10000, service: 4000, pajak: 8400, pax: 4, status: "voided" }),
     ], { labelOf });
     expect(summary.trxCount).toBe(1);
     expect(summary.methods.reduce((sum, method) => sum + method.amount, 0)).toBe(summary.total);
+    expect(summary.netSubtotal).toBe(35000);
+    expect(summary.discount).toBe(5000);
+    expect(summary.service).toBe(1750);
+    expect(summary.pajak).toBe(3675);
   });
 });

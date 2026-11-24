@@ -28,15 +28,9 @@ function useHistory({ toast_, addUndo, getNow, authH, applyBahanUsage = null }) 
       thn: String(date.getFullYear())
     };
     const dateStr = `${d.tgl}${d.blnNum}${d.thn.slice(-2)}`;
-    // Count transactions for this date from loaded history
-    const count = history.filter(t => {
-      const tDate = new Date(t.timestamp);
-      return tDate.getDate() === date.getDate() &&
-             tDate.getMonth() === date.getMonth() &&
-             tDate.getFullYear() === date.getFullYear();
-    }).length + 1;
-    return `TRX-${dateStr}${count}`;
-  }, [history, getNow]);
+    // The final sequence is allocated against stored IDs during payment.
+    return `TRX-${dateStr}1`;
+  }, [getNow]);
 
   // ── Core: Load filtered & paginated transactions from backend
   const loadFiltered = useCallback(async (page = 0, filters = {}) => {
@@ -224,8 +218,10 @@ function useHistory({ toast_, addUndo, getNow, authH, applyBahanUsage = null }) 
       const path = res?.path || res?.filePath;
       if (res?.ok) toast_(path ? `${filename} disimpan: ${path}` : `${filename} disimpan`, "ok", path ? 8000 : 3000);
       else toast_(res?.error || "Unduhan CSV dibatalkan", "err");
+      return !!res?.ok;
     } catch (error) {
       toast_(error?.message || "Gagal menyimpan CSV", "err");
+      return false;
     }
   }, [getNow, toast_]);
 
