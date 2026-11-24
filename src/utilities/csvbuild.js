@@ -55,9 +55,10 @@ function csvByDay(trxs, header, rowFn, at) {
   return sections.join("\n");
 }
 
-const TRX_HEADER = "No.Trx,Hari,Tanggal,Jam,Metode,Nama Item,Kategori,Qty,Harga Jual,Modal,Subtotal Jual,Subtotal Modal,Laba Item,Subtotal Trx,Total Trx,Bayar,Kembalian,Status,Alasan Void,Waktu Unduh";
+const TRX_HEADER = "No.Trx,Hari,Tanggal,Jam,Metode,Nama Item,Kategori,Qty,Harga Jual,Modal,Subtotal Jual,Subtotal Modal,Laba Item,Subtotal Trx,Diskon Trx,Hasil Bersih (Subtotal),Total Biaya Service,Total Biaya Pajak,Total Trx,Bayar,Kembalian,Status,Alasan Void,Waktu Unduh";
 function trxRow(t, at, categories = [], paymentMethods = []) {
-  const {total}=calcPrice(t.subtotal);
+  const total = Number(t.total ?? calcPrice(t.subtotal).total);
+  const netSubtotal = Number(t.subtotal || 0);
   const isVoid = t.status === "voided" || t.voided === true;
   const statusLabel = isVoid ? "VOID" : "LUNAS";
   const voidReason = isVoid ? (t.voidReason || "") : "";
@@ -65,7 +66,7 @@ function trxRow(t, at, categories = [], paymentMethods = []) {
     const subJ=item.harga*item.qty; const subM=(item.modal||0)*item.qty;
     const metodeLabel = getPaymentMethodLabel(t.metodeBayar || "cash", paymentMethods, t.metodeBayarLabel);
     const catLabel = getCategoryLabel(item.kategori, categories);
-    return [t.id,t.hari,`${t.tgl} ${t.bln} ${t.thn}`,`${t.jam}:${t.mnt}:${t.dtk}`,metodeLabel,`"${item.nama}"`,catLabel,item.qty,item.harga,item.modal||0,subJ,subM,subJ-subM,t.subtotal,total,t.bayar||0,t.kembalian||0,statusLabel,voidReason,at].join(",");
+    return [t.id,t.hari,`${t.tgl} ${t.bln} ${t.thn}`,`${t.jam}:${t.mnt}:${t.dtk}`,metodeLabel,`"${item.nama}"`,catLabel,item.qty,item.harga,item.modal||0,subJ,subM,subJ-subM,t.subtotal,t.discount||0,netSubtotal,t.service||0,t.pajak||0,total,t.bayar||0,t.kembalian||0,statusLabel,voidReason,at].join(",");
   });
 }
 
@@ -142,7 +143,10 @@ function csvPerMenu(trxs, menuList, at, categories = []) {
     const catLabel = getCategoryLabel(m.kategori, categories);
     return [`"${m.nama}"`,catLabel,m.harga,m.modal||0,d.qty,d.rev,d.modal,laba,margin,status,at].join(",");
   });
-  return [h,...rows].join("\n");
+  const subtotalTotal = trxs.reduce((sum, trx) => sum + (Number(trx.subtotal) || 0), 0);
+  const serviceTotal = trxs.reduce((sum, trx) => sum + (Number(trx.service) || 0), 0);
+  const pajakTotal = trxs.reduce((sum, trx) => sum + (Number(trx.pajak) || 0), 0);
+  return [h,...rows,"","RINGKASAN TRANSAKSI","Komponen,Total (Rp)",`Hasil Bersih (Subtotal),${subtotalTotal}`,`Total Biaya Service,${serviceTotal}`,`Total Biaya Pajak,${pajakTotal}`].join("\n");
 }
 
 // Stock Report CSV - Laporan Stok

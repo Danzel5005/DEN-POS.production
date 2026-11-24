@@ -811,26 +811,51 @@ ipcMain.handle("trx-restore", (_e, list) => {
       return deltas;
     }
 
+    function allocateTrxId(trx, existingIds) {
+      const match = /^TRX-(\d{6})\d+$/.exec(String(trx?.id || ""));
+      if (!match) return trx;
+      const prefix = `TRX-${match[1]}`;
+      let maxSequence = 0;
+      for (const existingId of existingIds) {
+        const id = String(existingId || "");
+        const suffix = id.startsWith(prefix) ? id.slice(prefix.length) : "";
+        if (/^\d+$/.test(suffix)) maxSequence = Math.max(maxSequence, Number(suffix));
+      }
+      const id = `${prefix}${maxSequence + 1}`;
+      const allocated = { ...trx, id };
+      if (trx.kdsSourceRef === trx.id) allocated.kdsSourceRef = id;
+      return allocated;
+    }
+
     ipcMain.handle("process-payment", (_e, { trx, updatedMenu, activeBillId }) => {
       try {
         if (!db) {
-          const allTrx = rJSON(files.trx) || []; allTrx.unshift(trx); atomicWrite(files.trx, allTrx);
+          const allTrx = rJSON(files.trx) || [];
+          const savedTrx = allocateTrxId(trx, allTrx.map((item) => item?.id));
+          allTrx.unshift(savedTrx); atomicWrite(files.trx, allTrx);
           if (updatedMenu) atomicWrite(files.menu, updatedMenu);
           if (activeBillId) atomicWrite(files.bills, (rJSON(files.bills) || []).filter((bill) => String(bill.id) !== String(activeBillId)));
-          return { ok: true, stock: {} };
+          return { ok: true, stock: {}, trx: savedTrx };
         }
-        walAppend(trx);
         // INSERT transaksi + potong stok dalam SATU transaksi SQLite. Kalau
         // bayar dari open bill, stok sudah dipotong saat bill dibuat -> skip.
         let stock = {};
+        let savedTrx = trx;
         const run = db.transaction(() => {
-          db.prepare("INSERT INTO transactions (id, data) VALUES (?, ?)").run(trx.id || null, JSON.stringify(trx));
-          if (!activeBillId) stock = applyStockDelta(stockDeltasFromTrx(trx, -1), { type: "sale", ref: trx?.id });
+          const match = /^TRX-(\d{6})\d+$/.exec(String(trx?.id || ""));
+          if (match) {
+            const prefix = `TRX-${match[1]}`;
+            const ids = db.prepare("SELECT id FROM transactions WHERE id LIKE ?").all(`${prefix}%`).map((row) => row.id);
+            savedTrx = allocateTrxId(trx, ids);
+          }
+          walAppend(savedTrx);
+          db.prepare("INSERT INTO transactions (id, data) VALUES (?, ?)").run(savedTrx.id || null, JSON.stringify(savedTrx));
+          if (!activeBillId) stock = applyStockDelta(stockDeltasFromTrx(savedTrx, -1), { type: "sale", ref: savedTrx?.id });
         });
         run();
         if (activeBillId) atomicWrite(files.bills, (rJSON(files.bills) || []).filter((bill) => String(bill.id) !== String(activeBillId)));
         walClear();
-        return { ok: true, stock };
+        return { ok: true, stock, trx: savedTrx };
       } catch (err) { console.error("[process-payment] Error:", err.message); return { ok: false, error: err.message }; }
     });
     ipcMain.handle("shifts-load", () => {

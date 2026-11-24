@@ -96,6 +96,17 @@ describe("csvbuild.js - CSV Generator Utilities", () => {
       expect(rows[0]).toContain(timeDownload);
     });
 
+    it("includes subtotal, service, and tax amounts in transaction export", () => {
+      const trx = { ...sampleTrx1, discount: 2000, service: 2400, pajak: 5040 };
+      const values = trxRow(trx, timeDownload, [], [])[0].split(",");
+      const headers = TRX_HEADER.split(",");
+
+      expect(values[headers.indexOf("Hasil Bersih (Subtotal)")]).toBe("50000");
+      expect(values[headers.indexOf("Total Biaya Service")]).toBe("2400");
+      expect(values[headers.indexOf("Total Biaya Pajak")]).toBe("5040");
+      expect(values[headers.indexOf("Total Trx")]).toBe(String(trx.total));
+    });
+
     it("should handle trxRow with missing modal, pax, bayar, or kembalian gracefully", () => {
       const minimalTrx = {
         id: "TRX-MIN",
@@ -268,6 +279,13 @@ describe("csvbuild.js - CSV Generator Utilities", () => {
       expect(csv).toContain("Nama Menu,Kategori,Harga Jual");
       expect(csv).toContain('"Kopi Black",Minuman,20000,8000,1,20000,8000,12000');
       expect(csv).toContain('"Teh Manis",Minuman,10000,3000,0,0,0,0,N/A,Belum Terjual');
+    });
+
+    it("includes total service and tax charges in the Sales Report CSV", () => {
+      const csv = csvPerMenu([{ ...sampleTrx1, service: 2400, pajak: 5040 }], mockMenuList, timeDownload, []);
+      expect(csv).toContain("Hasil Bersih (Subtotal),50000");
+      expect(csv).toContain("Total Biaya Service,2400");
+      expect(csv).toContain("Total Biaya Pajak,5040");
     });
   });
 

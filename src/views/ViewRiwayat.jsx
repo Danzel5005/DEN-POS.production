@@ -146,7 +146,11 @@ function ViewRiwayat({
   const handleCSVExport = useCallback(async () => {
     const allTrx = await loadAllForExport();
     if (!allTrx.length) return;
-    doCSV("Transaksi", csvByDay(allTrx, TRX_HEADER, (t, at) => trxRow(t, at, menuH?.cats || [], paymentMethods), at()));
+    const saved = await doCSV("Transaksi", csvByDay(allTrx, TRX_HEADER, (t, at) => trxRow(t, at, menuH?.cats || [], paymentMethods), at()));
+    if (saved) {
+      setFFrom("");
+      setFTo("");
+    }
   }, [loadAllForExport, doCSV, menuH, paymentMethods]);
 
   // ── Infinite scroll handler

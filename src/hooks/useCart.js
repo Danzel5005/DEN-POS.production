@@ -533,20 +533,21 @@ const processPayment = useCallback(async ({
   // main process melewatkan deduksi ulang karena activeBillId dikirim.
   const result = await api.processPayment({ trx, activeBillId: billIdToClose });
 
-  if (!result.ok) { toast_("Gagal menyimpan transaksi", "err"); return null; }
+  if (!result.ok) { toast_(`Gagal menyimpan transaksi${result.error ? `: ${result.error}` : ""}`, "err"); return null; }
+  const savedTrx = result.trx || trx;
 
   if (kdsSettings.enabled) {
     await queueKdsTickets({
       items,
       prevItems: billIdToClose && kdsSent ? kdsPreviousItems : undefined,
       meta: {
-        sourceRef: String(billIdToClose || trx.id),
-        sourceLabel: billIdToClose ? `Bill #${billIdToClose}` : `Transaksi #${trx.id}`,
-        clientTicketId: `${billIdToClose || trx.id}:${t.timestamp}`,
+        sourceRef: String(billIdToClose || savedTrx.id),
+        sourceLabel: billIdToClose ? `Bill #${billIdToClose}` : `Transaksi #${savedTrx.id}`,
+        clientTicketId: `${billIdToClose || savedTrx.id}:${t.timestamp}`,
         createdAt: t.timestamp,
-        tableLabel: trx.tableNumber ? `Meja ${trx.tableNumber}` : "",
+        tableLabel: savedTrx.tableNumber ? `Meja ${savedTrx.tableNumber}` : "",
         extras: receiptAdditionals.filter((field) => field.category === "receipt" && receiptAdditionalData[field.key]).map((field) => ({ label: field.label, value: receiptAdditionalData[field.key] })),
-        createdByLabel: trx.operator,
+        createdByLabel: savedTrx.operator,
       },
     });
   }
@@ -554,13 +555,13 @@ const processPayment = useCallback(async ({
   if (result.stock && applyStockView) applyStockView(result.stock); // patch view setelah IPC sukses
   // Bahan baku: potong sesuai resep hanya untuk penjualan langsung (bukan
   // pelunasan open bill — stok bahan sudah dipotong saat bill dibuat).
-  if (applyBahanUsage && !billIdToClose) applyBahanUsage(trx.items, -1);
-  appendHistory(trx);          // setHistory(h=>[trx,...h])
+  if (applyBahanUsage && !billIdToClose) applyBahanUsage(savedTrx.items, -1);
+  appendHistory(savedTrx);          // setHistory(h=>[trx,...h])
   // Remove the paid bill from open bills using explicit billIdToClose
   removeBillLocal(billIdToClose);
   clearCart();
-  if (onSuccess) onSuccess(trx);
-  return trx;
+  if (onSuccess) onSuccess(savedTrx);
+  return savedTrx;
 }, [items, subtotal, pricingConfig, manualDiscount, manualDiscountValue, effectiveManualDiscountType, checkRequiredManualDiscount, metode, paidNum, kembalian, cart, toast_, getNow, clearCart, stockErrors, applyBahanUsage, pax, tableNumber, receiptAdditionals, kdsSettings.enabled, queueKdsTickets]);
 
   return {

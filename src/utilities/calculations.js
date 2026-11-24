@@ -73,10 +73,10 @@ function calcPrice(subtotal, options = {}) {
   let base = discountedSubtotal;
   const pajakRate = options.pajak?.enabled === false ? 0 : asNumber(options.pajak?.value);
   const serviceRate = options.service?.enabled === false ? 0 : asNumber(options.service?.value);
-  const pajak = base * Math.max(0, pajakRate) / 100;
-  base += pajak;
   const service = base * Math.max(0, serviceRate) / 100;
   base += service;
+  const pajak = base * Math.max(0, pajakRate) / 100;
+  base += pajak;
 
   return {
     pajak: pajak > 0 ? Math.ceil(pajak) : 0,

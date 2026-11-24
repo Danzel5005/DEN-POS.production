@@ -73,6 +73,9 @@ function paymentMix(transactions = [], labelOf = (k) => k) {
 function buildOmsetSummary(transactions = [], { labelOf = (k) => k } = {}) {
   const methodsMap = new Map();
   let total = 0;
+  let netSubtotal = 0;
+  let service = 0;
+  let pajak = 0;
   let trxCount = 0;
   let pax = 0;
 
@@ -85,6 +88,9 @@ function buildOmsetSummary(transactions = [], { labelOf = (k) => k } = {}) {
     entry.count += 1;
     methodsMap.set(key, entry);
     total += amount;
+    netSubtotal += Number(trx?.subtotal || 0);
+    service += Number(trx?.service || 0);
+    pajak += Number(trx?.pajak || 0);
     trxCount += 1;
     pax += Math.max(0, Math.floor(Number(trx?.pax) || 0));
   }
@@ -96,6 +102,9 @@ function buildOmsetSummary(transactions = [], { labelOf = (k) => k } = {}) {
   return {
     methods,
     total,
+    netSubtotal,
+    service,
+    pajak,
     trxCount,
     pax,
     avgPerPax: pax > 0 ? total / pax : 0,

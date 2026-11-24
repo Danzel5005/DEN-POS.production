@@ -85,7 +85,7 @@ describe("calculations.js - calcPrice", () => {
     expect(res.total).toBe(427500);
   });
 
-  it("applies fixed discounts and compounds tax then service", () => {
+  it("applies fixed discounts, then service, then tax on service", () => {
     const res = calcPrice(0, {
       items: [{ id: "tea", kategori: "drink", harga: 10000, qty: 2 }],
       discounts: [{ type: "fixed", value: 5000, scope: "category", target: "drink" }],
@@ -93,9 +93,20 @@ describe("calculations.js - calcPrice", () => {
       service: { enabled: true, value: 5 },
     });
     expect(res.discount).toBe(5000);
-    expect(res.pajak).toBe(1500);
-    expect(res.service).toBe(825);
+    expect(res.pajak).toBe(1575);
+    expect(res.service).toBe(750);
     expect(res.total).toBe(17325);
+  });
+
+  it("calculates tax on subtotal including the service charge", () => {
+    const res = calcPrice(100000, {
+      pajak: { enabled: true, value: 10 },
+      service: { enabled: true, value: 6 },
+    });
+
+    expect(res.service).toBe(6000);
+    expect(res.pajak).toBe(10600);
+    expect(res.total).toBe(116600);
   });
 
   it("applies one fixed global discount to the whole cart", () => {
@@ -128,7 +139,7 @@ describe("calculations.js - calcPrice", () => {
     expect(res.total).toBe(13500);
   });
 
-  it("manual percentage discount replaces configured discounts before tax and service", () => {
+  it("manual percentage discount replaces configured discounts before service and tax", () => {
     const res = calcPrice(0, {
       items: [{ id: "coffee", harga: 100000, qty: 1 }],
       discounts: [{ type: "fixed", value: 50000, scope: "global" }],
@@ -137,8 +148,8 @@ describe("calculations.js - calcPrice", () => {
       service: { enabled: true, value: 5 },
     });
     expect(res.discount).toBe(10000);
-    expect(res.pajak).toBe(9000);
-    expect(res.service).toBe(4950);
+    expect(res.pajak).toBe(9450);
+    expect(res.service).toBe(4500);
     expect(res.total).toBe(103950);
   });
 
