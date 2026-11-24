@@ -389,6 +389,7 @@ const rev=shiftTrx.reduce((s,t)=>s+paidOf(t),0);
         {[
           {l:"Total Pendapatan",v:fmt(rev),c:G,s:`dari ${shiftTrx.length} trx`,key:"income"},
           {l:"Hasil Bersih",v:fmt(omsetSummary.netSubtotal),c:"#1a5fb4",s:"akumulasi subtotal transaksi",key:"net-subtotal"},
+          {l:"Total Diskon",v:fmt(omsetSummary.discount),c:"#b87a00",s:"akumulasi diskon transaksi",key:"discount"},
           {l:"Total Biaya Service",v:fmt(omsetSummary.service),c:"#1a5fb4",s:"akumulasi service transaksi",key:"service"},
           {l:"Total Biaya Pajak",v:fmt(omsetSummary.pajak),c:"#1a5fb4",s:"akumulasi pajak transaksi",key:"tax"},
           {l:"Total Pengeluaran",v:fmt(reportTotalExpenses),c:"#e84040",s:`${(selShift?.expenses || []).length || 0} catatan`,key:"expense"},

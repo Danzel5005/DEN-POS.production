@@ -74,6 +74,7 @@ function buildOmsetSummary(transactions = [], { labelOf = (k) => k } = {}) {
   const methodsMap = new Map();
   let total = 0;
   let netSubtotal = 0;
+  let discount = 0;
   let service = 0;
   let pajak = 0;
   let trxCount = 0;
@@ -89,6 +90,7 @@ function buildOmsetSummary(transactions = [], { labelOf = (k) => k } = {}) {
     methodsMap.set(key, entry);
     total += amount;
     netSubtotal += Number(trx?.subtotal || 0);
+    discount += Number(trx?.discount || 0);
     service += Number(trx?.service || 0);
     pajak += Number(trx?.pajak || 0);
     trxCount += 1;
@@ -103,6 +105,7 @@ function buildOmsetSummary(transactions = [], { labelOf = (k) => k } = {}) {
     methods,
     total,
     netSubtotal,
+    discount,
     service,
     pajak,
     trxCount,

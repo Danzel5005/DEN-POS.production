@@ -144,9 +144,10 @@ function csvPerMenu(trxs, menuList, at, categories = []) {
     return [`"${m.nama}"`,catLabel,m.harga,m.modal||0,d.qty,d.rev,d.modal,laba,margin,status,at].join(",");
   });
   const subtotalTotal = trxs.reduce((sum, trx) => sum + (Number(trx.subtotal) || 0), 0);
+  const discountTotal = trxs.reduce((sum, trx) => sum + (Number(trx.discount) || 0), 0);
   const serviceTotal = trxs.reduce((sum, trx) => sum + (Number(trx.service) || 0), 0);
   const pajakTotal = trxs.reduce((sum, trx) => sum + (Number(trx.pajak) || 0), 0);
-  return [h,...rows,"","RINGKASAN TRANSAKSI","Komponen,Total (Rp)",`Hasil Bersih (Subtotal),${subtotalTotal}`,`Total Biaya Service,${serviceTotal}`,`Total Biaya Pajak,${pajakTotal}`].join("\n");
+  return [h,...rows,"","RINGKASAN TRANSAKSI","Komponen,Total (Rp)",`Hasil Bersih (Subtotal),${subtotalTotal}`,`Total Diskon,${discountTotal}`,`Total Biaya Service,${serviceTotal}`,`Total Biaya Pajak,${pajakTotal}`].join("\n");
 }
 
 // Stock Report CSV - Laporan Stok

@@ -136,6 +136,7 @@ describe("insights.buildOmsetSummary", () => {
       methods: [],
       total: 0,
       netSubtotal: 0,
+      discount: 0,
       service: 0,
       pajak: 0,
       trxCount: 0,
@@ -151,11 +152,12 @@ describe("insights.buildOmsetSummary", () => {
   it("excludes voided transactions and keeps method sum equal to total", () => {
     const summary = buildOmsetSummary([
       trx({ id: "a", metodeBayar: "cash", total: 40000, subtotal: 35000, discount: 5000, service: 1750, pajak: 3675, pax: 2 }),
-      trx({ id: "b", metodeBayar: "qris", total: 90000, subtotal: 80000, discount: 0, service: 4000, pajak: 8400, pax: 4, status: "voided" }),
+      trx({ id: "b", metodeBayar: "qris", total: 90000, subtotal: 80000, discount: 10000, service: 4000, pajak: 8400, pax: 4, status: "voided" }),
     ], { labelOf });
     expect(summary.trxCount).toBe(1);
     expect(summary.methods.reduce((sum, method) => sum + method.amount, 0)).toBe(summary.total);
     expect(summary.netSubtotal).toBe(35000);
+    expect(summary.discount).toBe(5000);
     expect(summary.service).toBe(1750);
     expect(summary.pajak).toBe(3675);
   });

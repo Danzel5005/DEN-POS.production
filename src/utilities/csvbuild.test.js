@@ -282,8 +282,9 @@ describe("csvbuild.js - CSV Generator Utilities", () => {
     });
 
     it("includes total service and tax charges in the Sales Report CSV", () => {
-      const csv = csvPerMenu([{ ...sampleTrx1, service: 2400, pajak: 5040 }], mockMenuList, timeDownload, []);
+      const csv = csvPerMenu([{ ...sampleTrx1, discount: 3000, service: 2400, pajak: 5040 }], mockMenuList, timeDownload, []);
       expect(csv).toContain("Hasil Bersih (Subtotal),50000");
+      expect(csv).toContain("Total Diskon,3000");
       expect(csv).toContain("Total Biaya Service,2400");
       expect(csv).toContain("Total Biaya Pajak,5040");
     });

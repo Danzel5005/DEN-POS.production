@@ -157,6 +157,7 @@ function createPrintingService({ app, ipcMain, BrowserWindow, dialog, dataDir, e
     }
     printer.drawLine();
     kvReportLine("Hasil Bersih (Subtotal)", fmtRp(summary?.netSubtotal));
+    kvReportLine("Total Diskon", fmtRp(summary?.discount));
     kvReportLine("Total Biaya Service", fmtRp(summary?.service));
     kvReportLine("Total Biaya Pajak", fmtRp(summary?.pajak));
     printer.bold(true);
