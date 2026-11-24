@@ -157,9 +157,10 @@ const rev=shiftTrx.reduce((s,t)=>s+paidOf(t),0);
         printedDay,
         printedDate,
         summary: omsetSummary,
+        paperWidthMm: receiptPaperWidthMm,
       });
       const safeShift = String(shiftLabel || "laporan").replace(/[^a-zA-Z0-9]+/g, "-");
-      const res = await api.exportReportPdf({ html, defaultName: `Laporan-${safeShift}.pdf` });
+      const res = await api.exportReportPdf({ html, defaultName: `Laporan-${safeShift}.pdf`, paperWidthMm: receiptPaperWidthMm, paperFormat: "receipt" });
       if (res && res.ok) {
         (toast_ || (() => {}))("Laporan PDF disimpan", "ok");
       } else if (res && res.error && res.error !== "Dibatalkan") {
@@ -202,6 +203,7 @@ const rev=shiftTrx.reduce((s,t)=>s+paidOf(t),0);
           printedDay,
           printedDate,
           summary: omsetSummary,
+          paperWidthMm: receiptPaperWidthMm,
         });
         if (typeof printHTML === "function") {
           await printHTML(html, "Laporan berhasil dicetak");

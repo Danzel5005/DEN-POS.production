@@ -14,7 +14,7 @@ describe("reportHtml", () => {
     expect(rupiah(undefined)).toBe("Rp 0");
   });
 
-  it("menghasilkan dokumen HTML A4 yang valid", () => {
+  it("menghasilkan dokumen HTML format resi", () => {
     const html = buildReportHTML({
       shiftLabel: "Semua Shift",
       cashier: "admin",
@@ -30,7 +30,7 @@ describe("reportHtml", () => {
       },
     });
     expect(html).toContain("<!DOCTYPE html>");
-    expect(html).toContain("size: A4");
+    expect(html).toContain("size:80mm 210mm");
     expect(html).toContain("LAPORAN OMSET");
     expect(html).toContain("Minggu");
     expect(html).toContain("22 November 2026");
@@ -41,6 +41,7 @@ describe("reportHtml", () => {
     expect(html).not.toContain("Total Modal");
     expect(html).not.toContain("Laba Bersih");
     expect(html).not.toContain("Analitik Penjualan");
+    expect(html).toContain("Made by DENPOS");
   });
 
   it("escape semua data dinamis", () => {
@@ -52,5 +53,17 @@ describe("reportHtml", () => {
     expect(html).not.toContain("<b>shift</b>");
     expect(html).not.toContain("<script>");
     expect(html).toContain("&lt;QR&gt;");
+  });
+
+  it("mengikuti lebar kertas 58mm dan 80mm untuk cetak laporan", () => {
+    const summary = { methods: [{ key: "cash", label: "Tunai", amount: 100000, count: 1 }], total: 100000, trxCount: 1, pax: 2, avgPerPax: 50000, avgPerTrx: 100000 };
+    const html58 = buildReportHTML({ summary, paperWidthMm: 58 });
+    const html80 = buildReportHTML({ summary, paperWidthMm: 80 });
+    expect(html58).toContain("size:58mm 210mm");
+    expect(html58).toContain("width:58mm");
+    expect(html58).toContain("max-width:65%");
+    expect(html58).toContain("overflow-wrap:anywhere");
+    expect(html80).toContain("size:80mm 210mm");
+    expect(html80).toContain("width:80mm");
   });
 });

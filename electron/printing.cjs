@@ -113,6 +113,15 @@ function createPrintingService({ app, ipcMain, BrowserWindow, dialog, dataDir, e
     return lines;
   };
   const buildEscPosOmsetReport = (printer, summary, shiftLabel, printedDay, printedDate, cashier, cols) => {
+    const printWrapped = (text) => wrapText(text, cols).forEach((line) => printer.println(line));
+    const kvReportLine = (label, value) => {
+      if (String(label).length + String(value).length + 1 <= cols) {
+        kvLine(printer, label, value);
+      } else {
+        printWrapped(label);
+        printWrapped(value);
+      }
+    };
     printer.alignCenter();
     printer.bold(true);
     printer.setTextDoubleHeight();
@@ -121,12 +130,10 @@ function createPrintingService({ app, ipcMain, BrowserWindow, dialog, dataDir, e
     printer.resetLineSpacing();
     printer.bold(false);
     printer.alignLeft();
-    kvLine(printer, "Hari", printedDay);
-    kvLine(printer, "Tanggal", printedDate);
-    kvLine(printer, "Kasir", cashier);
-    for (const line of wrapText(shiftLabel, cols)) {
-      printer.println(line);
-    }
+    kvReportLine("Hari", printedDay);
+    kvReportLine("Tanggal", printedDate);
+    kvReportLine("Kasir", cashier);
+    printWrapped(shiftLabel);
     printer.drawLine();
     printer.bold(true);
     printer.println("Metode Pembayaran");
@@ -137,28 +144,31 @@ function createPrintingService({ app, ipcMain, BrowserWindow, dialog, dataDir, e
     } else {
       for (const method of methods) {
         const amount = fmtRp(method.amount);
-        const labelWidth = Math.max(8, cols - amount.length - 2);
-        const labelLines = wrapText(method.label || method.key || "-", labelWidth);
-        labelLines.forEach((label, index) => {
-          if (index === labelLines.length - 1) kvLine(printer, label, amount);
-          else printer.println(label);
-        });
+        const labelWidth = cols - amount.length - 2;
+        if (labelWidth > 0) {
+          const labelLines = wrapText(method.label || method.key || "-", labelWidth);
+          labelLines.slice(0, -1).forEach((line) => printer.println(line));
+          kvLine(printer, labelLines[labelLines.length - 1] || "-", amount);
+        } else {
+          printWrapped(method.label || method.key || "-");
+          printWrapped(amount);
+        }
       }
     }
     printer.drawLine();
     printer.bold(true);
-    kvLine(printer, "Total", fmtRp(summary?.total));
+    kvReportLine("Total", fmtRp(summary?.total));
     printer.bold(false);
     printer.drawLine();
-    kvLine(printer, "Total transaksi", String(Number(summary?.trxCount || 0)));
-    kvLine(printer, "Total Pax", String(Number(summary?.pax || 0)));
-    kvLine(printer, "Rata-Rata/Pax", fmtRp(summary?.avgPerPax));
-    kvLine(printer, "Rata-Rata/Transaksi", fmtRp(summary?.avgPerTrx));
+    kvReportLine("Total transaksi", String(Number(summary?.trxCount || 0)));
+    kvReportLine("Total Pax", String(Number(summary?.pax || 0)));
+    kvReportLine("Rata-Rata/Pax", fmtRp(summary?.avgPerPax));
+    kvReportLine("Rata-Rata/Transaksi", fmtRp(summary?.avgPerTrx));
     printer.drawLine();
     printer.alignCenter();
-    printer.println(`Hari cetak : ${printedDay}`);
-    printer.println(`Tanggal cetak : ${printedDate}`);
-    printer.println(`Kasir mencetak : ${cashier}`);
+    printWrapped(`Hari cetak : ${printedDay}`);
+    printWrapped(`Tanggal cetak : ${printedDate}`);
+    printWrapped(`Kasir mencetak : ${cashier}`);
     printer.cut();
   };
   const buildEscPosReceipt = (printer, trx, warungName, warungAddress, warungPhone, operatorName, cats = [], customerEnabled = true, receiptAdditionals = []) => {
@@ -195,14 +205,17 @@ function createPrintingService({ app, ipcMain, BrowserWindow, dialog, dataDir, e
     for (let offset = 0; offset < buffer.length; offset += 512) { await printDirect(driver, printerName, buffer.subarray(offset, Math.min(offset + 512, buffer.length))); if (offset + 512 < buffer.length) await new Promise((resolve) => setTimeout(resolve, 25)); }
   };
   
-ipcMain.handle("export-report-pdf", async (_e, { html, defaultName }) => {
+ipcMain.handle("export-report-pdf", async (_e, { html, defaultName, paperWidthMm, paperFormat }) => {
     ensureDir();
+    const paperW = normalizePaperWidthMm(paperWidthMm);
+    const reportHeightMm = 210;
+    const receiptFormat = paperFormat === "receipt";
     const reportFile = path.join(dataDir, "report-print.html");
     fs.writeFileSync(reportFile, html || "", "utf-8");
     const win = new BrowserWindow({
       show: false,
-      width: PAGE_WIDTH_MM * 3.78,
-      height: PAGE_HEIGHT_MM * 3.78,
+      width: receiptFormat ? paperW * 3.78 : PAGE_WIDTH_MM * 3.78,
+      height: receiptFormat ? reportHeightMm * 3.78 : PAGE_HEIGHT_MM * 3.78,
       webPreferences: { offscreen: true, javascript: false },
     });
     win.loadFile(reportFile);
@@ -213,7 +226,7 @@ ipcMain.handle("export-report-pdf", async (_e, { html, defaultName }) => {
             const pdfBuffer = await win.webContents.printToPDF({
               printBackground: true,
               preferCSSPageSize: true,
-              pageSize: "A4",
+              pageSize: receiptFormat ? { width: paperW * 1000, height: reportHeightMm * 1000 } : "A4",
               scale: 1,
               margins: { top: 0, bottom: 0, left: 0, right: 0 },
             });

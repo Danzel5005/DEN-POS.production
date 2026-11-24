@@ -4,8 +4,8 @@
 // ViewLaporan lalu mengembalikan string HTML siap dicetak ke PDF lewat
 // ipc "export-report-pdf" (Electron printToPDF + showSaveDialog).
 //
-// Tidak menyentuh storage, tidak butuh dependensi baru. Layout memakai
-// ukuran A4 (210mm x 297mm) dengan margin cetak.
+// Tidak menyentuh storage, tidak butuh dependensi baru. Layout mengikuti
+// lebar kertas resi dan format 210mm tinggi.
 
 function escapeHtml(value) {
   return String(value ?? "")
@@ -27,51 +27,61 @@ function buildReportHTML(opts = {}) {
     printedDay = "",
     printedDate = "",
     summary = {},
+    paperWidthMm = 80,
   } = opts;
+  const width = Math.min(210, Math.max(30, Math.round(Number(paperWidthMm) || 80)));
   const methods = Array.isArray(summary.methods) ? summary.methods : [];
   const methodRows = methods.map((method) =>
-    `<div class="method"><span>${escapeHtml(method.label || method.key)}</span><strong>${escapeHtml(rupiah(method.amount))}</strong></div>`
+    `<div class="kv"><span class="k">${escapeHtml(method.label || method.key)}</span><span class="v">${escapeHtml(rupiah(method.amount))}</span></div>`
   ).join("");
 
   return `<!DOCTYPE html>
 <html lang="id"><head><meta charset="utf-8">
 <title>LAPORAN OMSET</title>
 <style>
-  @page { size: A4; margin: 14mm; }
-  * { box-sizing: border-box; }
-  body { font-family: -apple-system, "Segoe UI", Roboto, Arial, sans-serif; color: #222; margin: 0; font-size: 12px; }
-  h1 { font-size: 20px; margin: 0 0 18px; text-align: center; }
-  .info, .method, .summary-row { display: flex; justify-content: space-between; gap: 12px; }
-  .info { margin: 3px 0; }
-  .period { margin: 12px 0 18px; font-size: 10px; color: #666; }
-  h2 { font-size: 13px; margin: 18px 0 8px; }
-  .method { padding: 5px 0; border-bottom: 1px dotted #ccc; }
-  .method strong { white-space: nowrap; }
-  .total { display: flex; justify-content: space-between; font-weight: 700; padding: 7px 0; border-top: 1px solid #222; }
-  .summary { margin-top: 16px; }
-  .summary-row { padding: 5px 0; }
-  .footer { margin-top: 32px; }
-  .footer div { margin: 3px 0; }
+  :root { --paper:#fdfdf9; --ink:#1c1c1c; --line:#1c1c1c; --bg:#eceae2; }
+  * { margin:0; padding:0; box-sizing:border-box; -webkit-print-color-adjust:exact; print-color-adjust:exact; font-weight:700; }
+  body { font-family:'Courier New',ui-monospace,Menlo,monospace; font-size:12px; width:${width}mm; padding:3mm; color:var(--ink); background:var(--bg); }
+  @media print { @page { size:${width}mm 210mm; margin:0; } body { width:${width}mm; max-width:${width}mm; padding:3mm; background:var(--paper); } }
+  .receipt { background:var(--paper); padding:6px 8px 2px; position:relative; }
+  .section { position:relative; padding:6px 0; }
+  .section + .section { border-top:1px dashed #999; }
+  .center { text-align:center; }
+  .store-name { font-size:15px; }
+  .kv { display:flex; justify-content:space-between; gap:8px; width:100%; min-width:0; font-size:12.5px; margin:2px 0; }
+  .kv .k { min-width:0; overflow-wrap:anywhere; }
+  .kv .v { min-width:0; max-width:65%; text-align:right; overflow-wrap:anywhere; }
+  .period { text-align:center; font-size:11px; margin-top:4px; }
+  .methods { margin-top:6px; border-top:1px dashed #999; padding-top:6px; }
+  .methods-title { text-align:center; margin-bottom:4px; font-size:12.5px; }
+  .totals { margin-top:6px; border-top:1px dashed #999; padding-top:6px; }
+  .grand { font-size:14px; padding-top:4px; margin-top:4px; border-top:1px solid var(--line); }
+  .footer-note { text-align:center; font-size:11px; margin-top:8px; }
 </style></head>
 <body>
-  <h1>LAPORAN OMSET</h1>
-  <div class="info"><span>Hari</span><strong>${escapeHtml(printedDay)}</strong></div>
-  <div class="info"><span>Tanggal</span><strong>${escapeHtml(printedDate)}</strong></div>
-  <div class="info"><span>Kasir</span><strong>${escapeHtml(cashier)}</strong></div>
-  <div class="period">${escapeHtml(shiftLabel)}</div>
-  <h2>Metode Pembayaran</h2>
-  ${methodRows || '<div class="method"><span>-</span><strong>Rp 0</strong></div>'}
-  <div class="total"><span>Total</span><strong>${escapeHtml(rupiah(summary.total))}</strong></div>
-  <div class="summary">
-    <div class="summary-row"><span>Total transaksi</span><strong>${escapeHtml(Number(summary.trxCount || 0))}</strong></div>
-    <div class="summary-row"><span>Total Pax</span><strong>${escapeHtml(Number(summary.pax || 0))}</strong></div>
-    <div class="summary-row"><span>Rata-Rata/Pax</span><strong>${escapeHtml(rupiah(summary.avgPerPax))}</strong></div>
-    <div class="summary-row"><span>Rata-Rata/Transaksi</span><strong>${escapeHtml(rupiah(summary.avgPerTrx))}</strong></div>
-  </div>
-  <div class="footer">
-    <div>Hari cetak : ${escapeHtml(printedDay)}</div>
-    <div>Tanggal cetak : ${escapeHtml(printedDate)}</div>
-    <div>Kasir mencetak : ${escapeHtml(cashier)}</div>
+  <div class="receipt">
+    <div class="section header">
+      <div class="store-name center">LAPORAN OMSET</div>
+      <div class="kv"><span class="k">Hari</span><span class="v">${escapeHtml(printedDay)}</span></div>
+      <div class="kv"><span class="k">Tanggal</span><span class="v">${escapeHtml(printedDate)}</span></div>
+      <div class="kv"><span class="k">Kasir</span><span class="v">${escapeHtml(cashier)}</span></div>
+      <div class="period">${escapeHtml(shiftLabel)}</div>
+    </div>
+    <div class="section methods">
+      <div class="methods-title">Metode Pembayaran</div>
+      ${methodRows || '<div class="kv"><span class="k">-</span><span class="v">Rp 0</span></div>'}
+      <div class="kv grand"><span class="k">Total</span><span class="v">${escapeHtml(rupiah(summary.total))}</span></div>
+    </div>
+    <div class="section totals">
+      <div class="kv"><span class="k">Total transaksi</span><span class="v">${escapeHtml(Number(summary.trxCount || 0))}</span></div>
+      <div class="kv"><span class="k">Total Pax</span><span class="v">${escapeHtml(Number(summary.pax || 0))}</span></div>
+      <div class="kv"><span class="k">Rata-Rata/Pax</span><span class="v">${escapeHtml(rupiah(summary.avgPerPax))}</span></div>
+      <div class="kv"><span class="k">Rata-Rata/Transaksi</span><span class="v">${escapeHtml(rupiah(summary.avgPerTrx))}</span></div>
+    </div>
+    <div class="section">
+      <div class="footer-note">Hari cetak : ${escapeHtml(printedDay)}<br/>Tanggal cetak : ${escapeHtml(printedDate)}<br/>Kasir mencetak : ${escapeHtml(cashier)}</div>
+      <div class="footer-note">Made by DENPOS</div>
+    </div>
   </div>
 </body></html>`;
 }
