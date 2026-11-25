@@ -71,7 +71,6 @@ function buildReportHTML(opts = {}) {
       <div class="methods-title">Metode Pembayaran</div>
       ${methodRows || '<div class="kv"><span class="k">-</span><span class="v">Rp 0</span></div>'}
       <div class="kv"><span class="k">Hasil Bersih (Subtotal)</span><span class="v">${escapeHtml(rupiah(summary.netSubtotal))}</span></div>
-      <div class="kv"><span class="k">Total Diskon</span><span class="v">${escapeHtml(rupiah(summary.discount))}</span></div>
       <div class="kv"><span class="k">Total Biaya Service</span><span class="v">${escapeHtml(rupiah(summary.service))}</span></div>
       <div class="kv"><span class="k">Total Biaya Pajak</span><span class="v">${escapeHtml(rupiah(summary.pajak))}</span></div>
       <div class="kv grand"><span class="k">Total</span><span class="v">${escapeHtml(rupiah(summary.total))}</span></div>

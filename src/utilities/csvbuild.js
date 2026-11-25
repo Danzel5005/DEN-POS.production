@@ -55,10 +55,10 @@ function csvByDay(trxs, header, rowFn, at) {
   return sections.join("\n");
 }
 
-const TRX_HEADER = "No.Trx,Hari,Tanggal,Jam,Metode,Nama Item,Kategori,Qty,Harga Jual,Modal,Subtotal Jual,Subtotal Modal,Laba Item,Subtotal Trx,Diskon Trx,Hasil Bersih (Subtotal),Total Biaya Service,Total Biaya Pajak,Total Trx,Bayar,Kembalian,Status,Alasan Void,Waktu Unduh";
+const TRX_HEADER = "No.Trx,Hari,Tanggal,Jam,Metode,Nama Item,Kategori,Qty,Harga Jual,Modal,Subtotal Jual,Subtotal Modal,Laba Item,Subtotal Trx,Hasil Bersih (Subtotal),Total Biaya Service,Total Biaya Pajak,Total Trx,Bayar,Kembalian,Status,Alasan Void,Waktu Unduh";
 function trxRow(t, at, categories = [], paymentMethods = []) {
   const total = Number(t.total ?? calcPrice(t.subtotal).total);
-  const netSubtotal = Number(t.subtotal || 0);
+  const netSubtotal = Number(t.subtotal || 0) - Number(t.discount || 0);
   const isVoid = t.status === "voided" || t.voided === true;
   const statusLabel = isVoid ? "VOID" : "LUNAS";
   const voidReason = isVoid ? (t.voidReason || "") : "";
@@ -66,7 +66,7 @@ function trxRow(t, at, categories = [], paymentMethods = []) {
     const subJ=item.harga*item.qty; const subM=(item.modal||0)*item.qty;
     const metodeLabel = getPaymentMethodLabel(t.metodeBayar || "cash", paymentMethods, t.metodeBayarLabel);
     const catLabel = getCategoryLabel(item.kategori, categories);
-    return [t.id,t.hari,`${t.tgl} ${t.bln} ${t.thn}`,`${t.jam}:${t.mnt}:${t.dtk}`,metodeLabel,`"${item.nama}"`,catLabel,item.qty,item.harga,item.modal||0,subJ,subM,subJ-subM,t.subtotal,t.discount||0,netSubtotal,t.service||0,t.pajak||0,total,t.bayar||0,t.kembalian||0,statusLabel,voidReason,at].join(",");
+    return [t.id,t.hari,`${t.tgl} ${t.bln} ${t.thn}`,`${t.jam}:${t.mnt}:${t.dtk}`,metodeLabel,`"${item.nama}"`,catLabel,item.qty,item.harga,item.modal||0,subJ,subM,subJ-subM,t.subtotal,netSubtotal,t.service||0,t.pajak||0,total,t.bayar||0,t.kembalian||0,statusLabel,voidReason,at].join(",");
   });
 }
 
@@ -143,15 +143,14 @@ function csvPerMenu(trxs, menuList, at, categories = []) {
     const catLabel = getCategoryLabel(m.kategori, categories);
     return [`"${m.nama}"`,catLabel,m.harga,m.modal||0,d.qty,d.rev,d.modal,laba,margin,status,at].join(",");
   });
-  const subtotalTotal = trxs.reduce((sum, trx) => sum + (Number(trx.subtotal) || 0), 0);
-  const discountTotal = trxs.reduce((sum, trx) => sum + (Number(trx.discount) || 0), 0);
+  const subtotalTotal = trxs.reduce((sum, trx) => sum + Number(trx.subtotal || 0) - Number(trx.discount || 0), 0);
   const serviceTotal = trxs.reduce((sum, trx) => sum + (Number(trx.service) || 0), 0);
   const pajakTotal = trxs.reduce((sum, trx) => sum + (Number(trx.pajak) || 0), 0);
-  return [h,...rows,"","RINGKASAN TRANSAKSI","Komponen,Total (Rp)",`Hasil Bersih (Subtotal),${subtotalTotal}`,`Total Diskon,${discountTotal}`,`Total Biaya Service,${serviceTotal}`,`Total Biaya Pajak,${pajakTotal}`].join("\n");
+  return [h,...rows,"","RINGKASAN TRANSAKSI","Komponen,Total (Rp)",`Hasil Bersih (Subtotal),${subtotalTotal}`,`Total Biaya Service,${serviceTotal}`,`Total Biaya Pajak,${pajakTotal}`].join("\n");
 }
 
 // Stock Report CSV - Laporan Stok
-function csvStok(menuList, categories = [], at) {
+function csvStok(menuList, categories = [], at, bahanRows = null) {
   const h = "Nama Menu,Kategori,Harga Jual,Modal,Stok Tersedia,Status,Waktu Unduh";
   const rows = menuList.map(m => {
     const catLabel = getCategoryLabel(m.kategori, categories);
@@ -159,7 +158,16 @@ function csvStok(menuList, categories = [], at) {
     const status = m.stok === null ? "Tidak Dibatasi" : (m.stok <= 0 ? "HABIS" : m.stok <= 5 ? "RENDAH" : "TERSEDIA");
     return [`"${m.nama}"`, catLabel, m.harga, m.modal || 0, stok, status, at].join(",");
   });
-  return [h, ...rows].join("\n");
+    const out = [h, ...rows];
+  if (bahanRows && bahanRows.length) {
+    out.push("", "STOK BAHAN BAKU (RESEP HPP)",
+      "Nama Bahan,Satuan,Stok Tersedia,Stok Minimum,Harga Satuan,Nilai Stok,Dipakai di Menu,Status,Waktu Unduh");
+    bahanRows.forEach(b => {
+      const status = b.stok <= 0 ? "HABIS" : (b.minStok > 0 && b.stok <= b.minStok) ? "RENDAH" : "TERSEDIA";
+      out.push([`"${b.nama}"`, b.satuan, b.stok, b.minStok, b.hargaSatuan, b.stok * b.hargaSatuan, `"${b.dipakai.join("|")}"`, status, at].join(","));
+    });
+  }
+  return out.join("\n");
 }
 
 function csvMetodeBayar(trxs, at, paymentMethods = []) {

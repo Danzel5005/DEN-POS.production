@@ -136,7 +136,6 @@ describe("insights.buildOmsetSummary", () => {
       methods: [],
       total: 0,
       netSubtotal: 0,
-      discount: 0,
       service: 0,
       pajak: 0,
       trxCount: 0,
@@ -156,8 +155,7 @@ describe("insights.buildOmsetSummary", () => {
     ], { labelOf });
     expect(summary.trxCount).toBe(1);
     expect(summary.methods.reduce((sum, method) => sum + method.amount, 0)).toBe(summary.total);
-    expect(summary.netSubtotal).toBe(35000);
-    expect(summary.discount).toBe(5000);
+    expect(summary.netSubtotal).toBe(30000);
     expect(summary.service).toBe(1750);
     expect(summary.pajak).toBe(3675);
   });

@@ -23,8 +23,7 @@ describe("reportHtml", () => {
       summary: {
         methods: [{ key: "cash", label: "Tunai", amount: 100000, count: 2 }],
         total: 100000,
-        netSubtotal: 85000,
-        discount: 3000,
+        netSubtotal: 82000,
         service: 5000,
         pajak: 10000,
         trxCount: 2,
@@ -41,9 +40,8 @@ describe("reportHtml", () => {
     expect(html).toContain("admin");
     expect(html).toContain("Tunai");
     expect(html).toContain("Hasil Bersih (Subtotal)");
-    expect(html).toContain("Rp 85.000");
-    expect(html).toContain("Total Diskon");
-    expect(html).toContain("Rp 3.000");
+    expect(html).toContain("Rp 82.000");
+    expect(html).not.toContain("Total Diskon");
     expect(html).toContain("Total Biaya Service");
     expect(html).toContain("Rp 5.000");
     expect(html).toContain("Total Biaya Pajak");

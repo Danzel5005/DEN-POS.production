@@ -128,6 +128,17 @@ const rev=shiftTrx.reduce((s,t)=>s+paidOf(t),0);
       },0)
     : 0;
   const hasHppResep=showResepHpp&&hppResep>0;
+    const bahanResepRows = !showResepHpp ? null : (() => {
+    const resep = advancedData?.resep || {};
+    const used = {};
+    Object.entries(resep).forEach(([menuId, lines]) => {
+      const nama = menu.find(m => String(m.id) === String(menuId))?.nama || `Menu ${menuId}`;
+      (lines || []).forEach(l => { (used[l.bahanId] ||= []).push(nama); });
+    });
+    return (advancedData?.bahanBaku || [])
+      .filter(b => used[b.id])
+      .map(b => ({ ...b, dipakai: [...new Set(used[b.id])] }));
+  })();
  const showCashFlow = advOn("cashFlow");
   const labelOf = (key) => {
     const k = String(key || "cash").trim();
@@ -388,8 +399,7 @@ const rev=shiftTrx.reduce((s,t)=>s+paidOf(t),0);
       <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(170px,1fr))",gap:10,marginBottom:20}}>
         {[
           {l:"Total Pendapatan",v:fmt(rev),c:G,s:`dari ${shiftTrx.length} trx`,key:"income"},
-          {l:"Hasil Bersih",v:fmt(omsetSummary.netSubtotal),c:"#1a5fb4",s:"akumulasi subtotal transaksi",key:"net-subtotal"},
-          {l:"Total Diskon",v:fmt(omsetSummary.discount),c:"#b87a00",s:"akumulasi diskon transaksi",key:"discount"},
+          {l:"Hasil Bersih",v:fmt(omsetSummary.netSubtotal),c:"#1a5fb4",s:"subtotal dikurangi diskon",key:"net-subtotal"},
           {l:"Total Biaya Service",v:fmt(omsetSummary.service),c:"#1a5fb4",s:"akumulasi service transaksi",key:"service"},
           {l:"Total Biaya Pajak",v:fmt(omsetSummary.pajak),c:"#1a5fb4",s:"akumulasi pajak transaksi",key:"tax"},
           {l:"Total Pengeluaran",v:fmt(reportTotalExpenses),c:"#e84040",s:`${(selShift?.expenses || []).length || 0} catatan`,key:"expense"},
@@ -635,7 +645,7 @@ const rev=shiftTrx.reduce((s,t)=>s+paidOf(t),0);
             desc:"Daftar stok semua menu dengan kategori, harga, dan status ketersediaan.",
             btn:"Unduh CSV Stok",
             fn:()=>doCSV(`Laporan_Stok_${selectedShiftId==="all"?"Semua":`Shift${selShift?.shiftNum||""}`}`,
-              csvStok(menu, menuH?.cats || [], at()))},
+              csvStok(menu, menuH?.cats || [], at(), bahanResepRows))},
           {title:"Semua Transaksi Detail",
             desc:"Detail setiap transaksi, terpisah per hari dalam file CSV. Termasuk metode bayar.",
             btn:"Unduh CSV Transaksi",

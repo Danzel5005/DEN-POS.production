@@ -101,7 +101,8 @@ describe("csvbuild.js - CSV Generator Utilities", () => {
       const values = trxRow(trx, timeDownload, [], [])[0].split(",");
       const headers = TRX_HEADER.split(",");
 
-      expect(values[headers.indexOf("Hasil Bersih (Subtotal)")]).toBe("50000");
+      expect(values[headers.indexOf("Hasil Bersih (Subtotal)")]).toBe("48000");
+      expect(headers).not.toContain("Diskon Trx");
       expect(values[headers.indexOf("Total Biaya Service")]).toBe("2400");
       expect(values[headers.indexOf("Total Biaya Pajak")]).toBe("5040");
       expect(values[headers.indexOf("Total Trx")]).toBe(String(trx.total));
@@ -283,8 +284,8 @@ describe("csvbuild.js - CSV Generator Utilities", () => {
 
     it("includes total service and tax charges in the Sales Report CSV", () => {
       const csv = csvPerMenu([{ ...sampleTrx1, discount: 3000, service: 2400, pajak: 5040 }], mockMenuList, timeDownload, []);
-      expect(csv).toContain("Hasil Bersih (Subtotal),50000");
-      expect(csv).toContain("Total Diskon,3000");
+      expect(csv).toContain("Hasil Bersih (Subtotal),47000");
+      expect(csv).not.toContain("Total Diskon");
       expect(csv).toContain("Total Biaya Service,2400");
       expect(csv).toContain("Total Biaya Pajak,5040");
     });
@@ -328,6 +329,12 @@ describe("csvbuild.js - CSV Generator Utilities", () => {
   });
 
   describe("csvStok", () => {
+it("appends bahan baku section only when bahanRows given", () => {
+  const rows = [{ nama: "Gula", satuan: "kg", stok: 2, minStok: 5, hargaSatuan: 15000, dipakai: ["Kopi Black"] }];
+  expect(csvStok(mockMenuList, [], timeDownload, rows)).toContain("STOK BAHAN BAKU (RESEP HPP)");
+  expect(csvStok(mockMenuList, [], timeDownload)).not.toContain("BAHAN BAKU");
+});
+
     it("should generate stock report CSV with categories and status", () => {
       const mockCategories = [
         { key: "Minuman", label: "Minuman" },
