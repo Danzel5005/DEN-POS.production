@@ -135,6 +135,57 @@ describe("utils.js - LocalStorage Helper (LS) & API Wrapper", () => {
       expect(await api.loadTrx()).toEqual([]);
     });
 
+    it("deleteTrx menaruh transaksi di tempat sampah (browser)", async () => {
+      await api.saveTrx({ id: "TRX-1", total: 10000 });
+      await api.deleteTrx("TRX-1");
+      const { items } = await api.loadTrash();
+      expect(items).toHaveLength(1);
+      expect(items[0].trx).toEqual({ id: "TRX-1", total: 10000 });
+    });
+
+    it("clearTrx menaruh semua transaksi di tempat sampah (browser)", async () => {
+      await api.saveTrx({ id: "TRX-1", total: 1 });
+      await api.saveTrx({ id: "TRX-2", total: 2 });
+      await api.clearTrx();
+      expect((await api.loadTrash()).items.map((i) => i.id).sort()).toEqual(["TRX-1", "TRX-2"]);
+    });
+
+    it("trash-restore mengembalikan transaksi dan menahan stok lagi (browser)", async () => {
+      LS("ykk_menu", [{ id: "M1", nama: "Kopi", stok: 3 }]);
+      await api.saveTrx({ id: "TRX-1", items: [{ id: "M1", qty: 2 }] });
+      await api.deleteTrx("TRX-1", { restoreStock: true });
+      expect((await api.loadMenu())[0].stok).toBe(5);
+
+      const res = await api.restoreTrash("TRX-1");
+      expect(res.restored).toBe(true);
+      expect((await api.loadTrx()).map((t) => t.id)).toEqual(["TRX-1"]);
+      expect((await api.loadMenu())[0].stok).toBe(3);
+      expect((await api.loadTrash()).items).toEqual([]);
+    });
+
+    it("trash-restore mengganti nomor yang sudah dipakai transaksi baru (browser)", async () => {
+      await api.saveTrx({ id: "TRX-2611261", total: 1 });
+      await api.deleteTrx("TRX-2611261");
+      await api.processPayment({ trx: { id: "TRX-2611261", total: 2 } });
+
+      const res = await api.restoreTrash("TRX-2611261");
+
+      expect(res.trx.id).toBe("TRX-261126101");
+      expect((await api.loadTrx()).map((t) => t.id).sort()).toEqual(["TRX-2611261", "TRX-261126101"]);
+    });
+
+    it("trash-delete menghapus permanen (browser)", async () => {
+      await api.saveTrx({ id: "TRX-1", total: 1 });
+      await api.deleteTrx("TRX-1");
+      expect(await api.deleteTrash("TRX-1")).toEqual({ ok: true });
+      expect((await api.loadTrash()).items).toEqual([]);
+    });
+
+    it("loadTrash membuang entri lebih tua dari 30 hari (browser)", async () => {
+      LS("ykk_trx_trash", [{ id: "X", trx: { id: "X" }, deletedAt: new Date(Date.now() - 31 * 86400000).toISOString(), stockRestored: false }]);
+      expect((await api.loadTrash()).items).toEqual([]);
+    });
+
     it("deleteTrx with restoreStock adds stock back (browser)", async () => {
       LS("ykk_menu", [
         { id: "M1", nama: "Kopi", stok: 3 },

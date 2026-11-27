@@ -136,6 +136,7 @@ describe("regresi: konstanta desain harus di-import", () => {
     "../components/modals/settings-tabs/BackupSettingsTab.jsx",
     "../components/modals/settings-tabs/UsersSettingsTab.jsx",
     "../components/modals/settings-tabs/shared.jsx",
+    "../components/modals/settings-tabs/RecycleBinSettingsTab.jsx",
     "../components/modals/SettingsModal.jsx",
     "../components/modals/BahanDetailModal.jsx",
     "../components/modals/BahanListModal.jsx",

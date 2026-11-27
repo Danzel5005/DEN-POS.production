@@ -203,6 +203,42 @@ function useHistory({ toast_, addUndo, getNow, authH, applyBahanUsage = null }) 
     });
   }, [refresh, addUndo, authH, toast_, applyBahanUsage]);
 
+  // ── Tempat sampah (Pengaturan → Tempat Sampah) ────────────────────────────
+  // Transaksi yang dihapus disimpan 30 hari di main process. Restore memasukkan
+  // kembali ke riwayat lewat INSERT tunggal (bukan restoreTrx) dan menahan stok
+  // lagi bila stok sempat dikembalikan saat dihapus.
+  const restoreTrashTrx = useCallback(async (id, { applyStockView } = {}) => {
+    if (!isAdmin(authH?.currentUser)) {
+      toast_("Hanya admin yang dapat memulihkan transaksi", "err");
+      return false;
+    }
+    const res = await api.restoreTrash(id);
+    if (!res?.ok) {
+      toast_(res?.error || "Gagal memulihkan transaksi", "err");
+      return false;
+    }
+    const applied = res.applied || {};
+    if (Object.keys(applied).length && applyStockView) applyStockView(applied);
+    if (res.restored && res.stockRestored && applyBahanUsage) applyBahanUsage(res.trx?.items || [], -1);
+    if (res.restored) refresh();
+    toast_(res.trx && res.trx.id !== id ? `Transaksi dipulihkan sebagai ${res.trx.id}` : "Transaksi dipulihkan", "ok");
+    return true;
+  }, [refresh, authH, toast_, applyBahanUsage]);
+
+  const purgeTrashTrx = useCallback(async (id) => {
+    if (!isAdmin(authH?.currentUser)) {
+      toast_("Hanya admin yang dapat menghapus transaksi", "err");
+      return false;
+    }
+    const res = await api.deleteTrash(id);
+    if (!res?.ok) {
+      toast_(res?.error || "Gagal menghapus transaksi", "err");
+      return false;
+    }
+    toast_("Transaksi dihapus permanen", "ok");
+    return true;
+  }, [authH, toast_]);
+
   // CSV timestamp
   const at = useCallback(() => {
     const t = getNow();
@@ -311,6 +347,8 @@ function useHistory({ toast_, addUndo, getNow, authH, applyBahanUsage = null }) 
     appendHistory,
     deleteTrx,
     clearAllTrx,
+    restoreTrashTrx,
+    purgeTrashTrx,
     at,
     doCSV,
     loadAllForExport,

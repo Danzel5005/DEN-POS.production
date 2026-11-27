@@ -43,6 +43,7 @@ const DATA_DIR = path.join(app.getPath("userData"), "data");
 const FILES = {
   dataDir: DATA_DIR,
   trx: path.join(DATA_DIR, "transactions.json"),
+  trxTrash: path.join(DATA_DIR, "transactions-trash.json"),
   bills: path.join(DATA_DIR, "open-bills.json"),
   menu: path.join(DATA_DIR, "menu.json"),
   logo: path.join(DATA_DIR, "logo.json"),

@@ -50,6 +50,8 @@ class FakeDatabase {
     if (e === "data") return row.data;
     if (e === "created_at") return row.created_at;
     if (e === "synced_at") return row.synced_at;
+    if (e === "deleted_at") return row.deleted_at;
+    if (e === "stock_restored") return row.stock_restored;
     if (e === "menu_id") return row.menu_id;
     if (e === "kategori") return row.kategori;
     if (e === "stok") return row.stok;
@@ -84,8 +86,8 @@ class FakeDatabase {
         const av = a.created_at.slice(0, 10); const bv = b.created_at.slice(0, 10);
         return av === bv ? 0 : (av < bv ? -1 : 1);
       }
-      const av = lower === "id" ? a.id : a.created_at;
-      const bv = lower === "id" ? b.id : b.created_at;
+      const av = lower === "id" ? a.id : lower === "deleted_at" ? a.deleted_at : a.created_at;
+      const bv = lower === "id" ? b.id : lower === "deleted_at" ? b.deleted_at : b.created_at;
       return av === bv ? 0 : (av < bv ? -1 : 1);
     });
     return desc ? sorted.reverse() : sorted;
@@ -195,6 +197,8 @@ class FakeDatabase {
       if (wants("stok")) projection.stok = (row) => row.stok;
       if (wants("data")) projection.data = (row) => row.data;
       if (wants("created_at")) projection.created_at = (row) => row.created_at;
+      if (wants("deleted_at")) projection.deleted_at = (row) => row.deleted_at;
+      if (wants("stock_restored")) projection.stock_restored = (row) => row.stock_restored;
       // COUNT(*) as total / as count — dipakai trx-load-filtered.
       if (/^COUNT\(\*\) as (total|count)$/i.test(select.trim())) {
         const alias = /\bas\s+(total|count)$/i.exec(select.trim())[1];
@@ -256,14 +260,20 @@ class FakeDatabase {
       tableRows.push({ event_id: params[0], item_type: itemType, item_id: params[1], item_name: params[2], qty: params[3], status, created_at: new Date().toISOString() });
       return { changes: 1 };
     }
-    const insert = /^INSERT (OR IGNORE )?INTO\s+(\w+)\s*\((.*?)\)\s*VALUES\s*\((.*?)\)$/i.exec(sql);
+    const insert = /^INSERT (OR IGNORE |OR REPLACE )?INTO\s+(\w+)\s*\((.*?)\)\s*VALUES\s*\((.*?)\)$/i.exec(sql);
     if (insert) {
-      const [, ignore, table, colsRaw, valsRaw] = insert;
+      const [, mode, table, colsRaw] = insert;
+      const ignore = mode === "OR IGNORE ";
+      const replace = mode === "OR REPLACE ";
       const cols = colsRaw.split(",").map((c) => c.trim());
       const rows = this.tables[table] || (this.tables[table] = []);
       const row = { rowid: this.nextRowid++, created_at: new Date().toISOString() };
       cols.forEach((col, i) => { row[col] = params[i]; });
       const uniqueColumn = cols.includes("id") ? "id" : cols.includes("event_id") ? "event_id" : null;
+      if (replace && uniqueColumn) {
+        const idx = rows.findIndex((r) => r[uniqueColumn] === row[uniqueColumn]);
+        if (idx >= 0) { rows[idx] = row; return { changes: 1 }; }
+      }
       if (ignore && uniqueColumn && rows.some((r) => r[uniqueColumn] === row[uniqueColumn])) return { changes: 0 };
       if (uniqueColumn && rows.some((r) => r[uniqueColumn] === row[uniqueColumn])) {
         const err = new Error("UNIQUE constraint failed");
@@ -349,6 +359,14 @@ class FakeDatabase {
       const before = rows.length;
       this.tables[delMenu[1]] = rows.filter((r) => String(r.menu_id) !== String(params[0]));
       return { changes: before - this.tables[delMenu[1]].length };
+    }
+    // Purge tempat sampah: DELETE FROM trx_deleted WHERE deleted_at < ?
+    const delExpired = /^DELETE\s+FROM\s+(\w+)\s+WHERE\s+deleted_at\s*<\s*\?$/i.exec(sql);
+    if (delExpired) {
+      const rows = this.tables[delExpired[1]] || [];
+      const before = rows.length;
+      this.tables[delExpired[1]] = rows.filter((r) => String(r.deleted_at) >= String(params[0]));
+      return { changes: before - this.tables[delExpired[1]].length };
     }
 
     throw new Error(`FakeDatabase: statement tidak didukung: ${sql}`);
@@ -444,6 +462,7 @@ describe("db.cjs: initDB & registerHandlers", () => {
       "menu-bulk-upsert", "menu-delete", "menu-load", "menu-replace", "menu-upsert",
       "process-payment", "shifts-load", "shifts-save",
       "stock-in", "stock-movements", "stock-opname", "stock-set",
+      "trash-delete", "trash-load", "trash-restore",
       "trx-clear", "trx-count-unsynced", "trx-delete", "trx-get-daily-stats", "trx-get-shift-ids",
       "trx-list-unsynced",
       "trx-load", "trx-load-filtered", "trx-mark-synced", "trx-restore", "trx-restore-cleared",
@@ -673,6 +692,120 @@ describe("db.cjs: undo hapus transaksi tidak menghapus data lain", () => {
     const res = call("trx-clear");
     expect(res.ok).toBe(true);
     expect(res.backupFile).toBeNull();
+  });
+});
+
+describe("db.cjs: tempat sampah transaksi (30 hari)", () => {
+  beforeEach(() => {
+    services.svc.initDB();
+    services.svc.registerHandlers();
+  });
+  const call = (name, ...args) => services.registry[name](null, ...args);
+  const trashTable = () => FakeBetterSqlite3.instances.at(-1).tables.trx_deleted || [];
+
+  it("trx-delete menaruh transaksi di tempat sampah dengan masa simpan 30 hari", () => {
+    call("trx-save", { id: "a", total: 5000 });
+    call("trx-delete", "a");
+    const { ok, items } = call("trash-load");
+    expect(ok).toBe(true);
+    expect(items).toHaveLength(1);
+    expect(items[0].trx).toEqual({ id: "a", total: 5000 });
+    const days = (new Date(items[0].expiresAt) - new Date(items[0].deletedAt)) / 86400000;
+    expect(Math.round(days)).toBe(30);
+  });
+
+  it("trx-clear menaruh SEMUA transaksi di tempat sampah", () => {
+    call("trx-save", { id: "a", total: 1 });
+    call("trx-save", { id: "b", total: 2 });
+    call("trx-clear");
+    expect(call("trash-load").items.map((i) => i.id).sort()).toEqual(["a", "b"]);
+  });
+
+  it("trash-restore mengembalikan transaksi ke riwayat dan mengosongkan tempat sampah", () => {
+    call("trx-save", { id: "a", total: 5000 });
+    call("trx-delete", "a");
+    const res = call("trash-restore", "a");
+    expect(res).toMatchObject({ ok: true, restored: true });
+    expect(call("trx-load").map((t) => t.id)).toEqual(["a"]);
+    expect(call("trash-load").items).toEqual([]);
+  });
+
+  it("trash-restore mengganti nomor yang sudah dipakai transaksi baru (+100)", () => {
+    call("trx-save", { id: "TRX-2611261", total: 1 });
+    call("trx-delete", "TRX-2611261");
+    // Transaksi baru memakai ulang nomor yang baru saja dihapus.
+    call("process-payment", { trx: { id: "TRX-2611261", total: 2 } });
+    expect(call("trx-load").map((t) => t.id)).toEqual(["TRX-2611261"]);
+
+    const res = call("trash-restore", "TRX-2611261");
+
+    expect(res).toMatchObject({ ok: true, restored: true });
+    expect(res.trx.id).toBe("TRX-261126101");
+    expect(call("trx-load").map((t) => t.id).sort()).toEqual(["TRX-2611261", "TRX-261126101"]);
+    expect(call("trash-load").items).toEqual([]);
+  });
+
+  it("trash-restore menaikkan lompatan ke +1000 bila +100 juga bentrok", () => {
+    call("trx-save", { id: "TRX-2611261", total: 1 });
+    call("trx-delete", "TRX-2611261");
+    call("process-payment", { trx: { id: "TRX-2611261", total: 2 } });
+    call("trx-save", { id: "TRX-261126101", total: 3 });
+
+    const res = call("trash-restore", "TRX-2611261");
+
+    expect(res.trx.id).toBe("TRX-2611261001");
+    expect(call("trx-load").map((t) => t.id).sort()).toEqual(["TRX-2611261", "TRX-2611261001", "TRX-261126101"]);
+  });
+
+  it("trash-restore memakai id lama bila belum bentrok", () => {
+    call("trx-save", { id: "TRX-2611261", kdsSourceRef: "TRX-2611261" });
+    call("trx-delete", "TRX-2611261");
+    const res = call("trash-restore", "TRX-2611261");
+    expect(res.trx).toMatchObject({ id: "TRX-2611261", kdsSourceRef: "TRX-2611261" });
+  });
+
+  it("undo 9 detik (trx-save) mengeluarkan transaksi dari tempat sampah", () => {
+    call("trx-save", { id: "a", total: 1 });
+    call("trx-delete", "a");
+    call("trx-save", { id: "a", total: 1 }); // undo 9 detik sempat mengembalikan
+    expect(call("trx-load")).toHaveLength(1);
+    expect(call("trash-load").items).toEqual([]);
+    expect(call("trash-restore", "a")).toMatchObject({ ok: false });
+  });
+
+  it("trash-restore menahan stok lagi bila stok dikembalikan saat dihapus", () => {
+    call("menu-replace", [{ id: "m1", nama: "Kopi", stok: 3 }]);
+    call("trx-save", { id: "d1", items: [{ id: "m1", qty: 2 }] });
+    call("trx-delete", "d1", { restoreStock: true }); // 3 -> 5
+    expect(call("menu-load")[0].stok).toBe(5);
+    const res = call("trash-restore", "d1");
+    expect(res.applied).toEqual({ m1: 3 });
+    expect(call("menu-load")[0].stok).toBe(3);
+  });
+
+  it("trash-restore TIDAK menyentuh stok bila stok tidak dikembalikan saat dihapus", () => {
+    call("menu-replace", [{ id: "m1", nama: "Kopi", stok: 3 }]);
+    call("trx-save", { id: "d2", items: [{ id: "m1", qty: 2 }] });
+    call("trx-delete", "d2");
+    expect(call("trash-restore", "d2").applied).toEqual({});
+    expect(call("menu-load")[0].stok).toBe(3);
+  });
+
+  it("trash-delete menghapus permanen tanpa menyentuh riwayat", () => {
+    call("trx-save", { id: "a", total: 1 });
+    call("trx-save", { id: "b", total: 2 });
+    call("trx-delete", "a");
+    expect(call("trash-delete", "a")).toEqual({ ok: true });
+    expect(call("trash-load").items).toEqual([]);
+    expect(call("trx-load").map((t) => t.id)).toEqual(["b"]);
+  });
+
+  it("trash-load membuang baris yang lebih tua dari 30 hari", () => {
+    call("trx-save", { id: "lama", total: 1 });
+    call("trx-delete", "lama");
+    const table = trashTable();
+    table[0].deleted_at = new Date(Date.now() - 31 * 86400000).toISOString();
+    expect(call("trash-load").items).toEqual([]);
   });
 });
 

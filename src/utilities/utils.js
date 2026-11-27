@@ -42,11 +42,46 @@ const stockDeltasFromTrxBrowser = (trx, sign = 1) => {
   return deltas;
 };
 
+// Nomor transaksi yang dihapus bisa dipakai ulang oleh transaksi baru. Saat
+// dipulihkan, geser nomor urut +100, +1000, ... sampai tidak bentrok.
+// shortcut: +100 bukan skema permanen, ganti ke counter monoton kalau ID
+// harian sudah melewati transaksi ke-100.
+const freeTrxIdBrowser = (trx, isTaken) => {
+  const match = /^TRX-(\d{6})(\d+)$/.exec(String(trx?.id || ""));
+  if (!match) return trx;
+  const prefix = `TRX-${match[1]}`;
+  const sequence = Number(match[2]);
+  let candidate = String(trx.id);
+  for (let bump = 100; isTaken(candidate); bump *= 10) candidate = `${prefix}${sequence + bump}`;
+  const renumbered = { ...trx, id: candidate };
+  if (trx.kdsSourceRef === trx.id) renumbered.kdsSourceRef = candidate;
+  return renumbered;
+};
+
+// Tempat sampah transaksi untuk mode browser (desktop memakai tabel
+// `trx_deleted` di main process). Aturan sama: disimpan 30 hari.
+const TRASH_DAYS = 30;
+const TRASH_KEY = "ykk_trx_trash";
+const trashExpiry = (deletedAt) => new Date(new Date(deletedAt).getTime() + TRASH_DAYS * 86400000).toISOString();
+const readTrash = () => {
+  const cutoff = new Date(Date.now() - TRASH_DAYS * 86400000).toISOString();
+  const rows = LS(TRASH_KEY) || [];
+  const kept = rows.filter((row) => String(row.deletedAt) >= cutoff);
+  if (kept.length !== rows.length) LS(TRASH_KEY, kept);
+  return kept;
+};
+const pushTrash = (trx, stockRestored) => {
+  if (!trx || trx.id === undefined || trx.id === null) return;
+  const rows = readTrash();
+  if (rows.some((row) => String(row.id) === String(trx.id))) return;
+  LS(TRASH_KEY, [{ id: String(trx.id), trx, deletedAt: new Date().toISOString(), stockRestored: !!stockRestored }, ...rows]);
+};
+
 
 
 const api = {
   async loadTrx()         { return window.kasirAPI ? (await window.kasirAPI.loadTrx() || []).map(healVoidedTrx) : (LS("ykk_trx")||[]).map(healVoidedTrx); },
-  async saveTrx(t)        { if(window.kasirAPI) return window.kasirAPI.saveTrx(t); const a=LS("ykk_trx")||[]; a.push(t); LS("ykk_trx",a); },
+  async saveTrx(t)        { if(window.kasirAPI) return window.kasirAPI.saveTrx(t); const a=LS("ykk_trx")||[]; a.push(t); LS("ykk_trx",a); LS(TRASH_KEY, (LS(TRASH_KEY)||[]).filter((row) => String(row.id) !== String(t.id))); },
   // Langkah 2b: opts.restoreStock meminta main menambah stok saat transaksi
   // dihapus. Di mode browser kita hitung sendiri delta positif dari item.
   //Pelunasan (settlement): tandai piutang transaksi jadi lunas (bayar = total).
@@ -71,6 +106,7 @@ async deleteTrx(id, opts) {
       const r = await api.applyStock(stockDeltasFromTrxBrowser(trx, 1), { type: "trx-delete", ref: id });
       applied = r?.stock || {};
     }
+    pushTrash(trx, opts?.restoreStock && !!trx && !isVoided(trx));
     return { ok: true, trx, applied };
   },
   async restoreTrx(list)  { if(window.kasirAPI) return window.kasirAPI.restoreTrx(list); LS("ykk_trx",list); },
@@ -90,6 +126,7 @@ async deleteTrx(id, opts) {
       applied = r?.stock || {};
     }
     LS("ykk_trx", []);
+    for (const t of all) pushTrash(t, opts?.restoreStock && !isVoided(t));
     return { ok: true, backupFile: null, applied, cleared: all };
   },
   // Langkah 2b: baca-saja — jumlah transaksi & unit yang akan dikembalikan,
@@ -114,6 +151,37 @@ async deleteTrx(id, opts) {
   async restoreClearedTrx(backupFile) {
     if (window.kasirAPI) return window.kasirAPI.restoreClearedTrx(backupFile);
     return { ok: false, error: "Tidak tersedia di mode browser" };
+  },
+  // Tempat sampah transaksi: daftar, pulihkan, hapus permanen (30 hari).
+  async loadTrash() {
+    if (window.kasirAPI?.loadTrash) return safeIpc("Tempat sampah", () => window.kasirAPI.loadTrash(), { fallback: { items: [] } });
+    return {
+      ok: true,
+      items: readTrash()
+        .map((row) => ({ id: row.id, trx: row.trx, deletedAt: row.deletedAt, expiresAt: trashExpiry(row.deletedAt), stockRestored: row.stockRestored }))
+        .sort((a, b) => String(b.deletedAt).localeCompare(String(a.deletedAt))),
+    };
+  },
+  async restoreTrash(id) {
+    if (window.kasirAPI?.restoreTrash) return safeIpc("Pulihkan transaksi", () => window.kasirAPI.restoreTrash(id));
+    const rows = readTrash();
+    const row = rows.find((item) => String(item.id) === String(id));
+    if (!row) return { ok: false, error: "Transaksi tidak ada di tempat sampah" };
+    const all = LS("ykk_trx") || [];
+    const trx = freeTrxIdBrowser(row.trx, (candidate) => all.some((item) => String(item?.id) === candidate));
+    LS("ykk_trx", [trx, ...all]);
+    let applied = {};
+    if (row.stockRestored) {
+      const r = await api.applyStock(stockDeltasFromTrxBrowser(trx, -1), { type: "trx-restore", ref: id });
+      applied = r?.stock || {};
+    }
+    LS(TRASH_KEY, rows.filter((item) => String(item.id) !== String(row.id)));
+    return { ok: true, trx, applied, restored: true, stockRestored: !!row.stockRestored };
+  },
+  async deleteTrash(id) {
+    if (window.kasirAPI?.deleteTrash) return safeIpc("Hapus permanen", () => window.kasirAPI.deleteTrash(id));
+    LS(TRASH_KEY, readTrash().filter((item) => String(item.id) !== String(id)));
+    return { ok: true };
   },
   async voidTrx(id, { reason, actor, note }) {
     if(window.kasirAPI) return window.kasirAPI.voidTrx(id, { reason, actor, note });

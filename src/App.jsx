@@ -659,7 +659,7 @@ const executeConfirmDel = useCallback((restoreStock = false) => {
       <footer style={{background:W,borderTop:`1px solid ${BD}`,padding:"3px 16px",...row,flexShrink:0}}>
         <span style={{fontSize:9,color:MT}}>Terima kasih berkunjung ke <span style={{color:OR,fontWeight:600}}>{settingsH.settings.warungName || "Warung"}</span></span>
         {dataPath&&<span style={{fontSize:8,color:"#ccc",overflow:"hidden",textOverflow:"ellipsis",maxWidth:300}}>{dataPath}</span>}
-        <span style={{fontSize:9,color:MT}}>v1.4.2</span>
+        <span style={{fontSize:9,color:MT}}>v1.4.4</span>
       </footer>
 
       <ModalStack
@@ -675,6 +675,7 @@ const executeConfirmDel = useCallback((restoreStock = false) => {
         printReceipt={printReceipt}
         setReceipt={setReceipt}
         menuH={menuH}
+        historyH={historyH}
         confirmCloseShift={confirmCloseShift}
         closeShiftWarning={settingsH.isAdvancedActive("attendance") ? closeShiftWarning : []}
         openingCashModal={openingCashModal}

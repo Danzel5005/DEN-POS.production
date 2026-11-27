@@ -12,6 +12,7 @@ import {
   AdvancedSettingsTab,
   CloudSyncSettingsTab,
   KdsSettingsTab,
+  RecycleBinSettingsTab,
 } from "./settings-tabs/index.js";
 import { useDeviceSync } from "../../hooks/useDeviceSync.js";
 
@@ -27,13 +28,14 @@ const SETTINGS_TABS = [
   ["advanced", "Fitur Lanjutan"],
   ["cloud", "Sync Cloud"],
   ["kds", "KDS"],
+  ["trash", "Tempat Sampah"],
 ];
 
 function SettingsTabButton({ tab, activeTab, onSelect, children }) {
   return <button onClick={() => onSelect(tab)} style={{ display: "flex", alignItems: "center", flexShrink: 0, width: "100%", boxSizing: "border-box", minHeight: 38, padding: "10px 13px", border: "none", cursor: "pointer", fontFamily: "inherit", fontSize: 11, fontWeight: 600, textAlign: "left", background: activeTab === tab ? "rgba(255,255,255,0.18)" : "transparent", color: W, borderLeft: activeTab === tab ? "3px solid #fff" : "3px solid transparent", transition: "all 0.15s" }}>{children}</button>;
 }
 
-function SettingsPanel({ tab, settingsH, authH, menu, cats, deviceH }) {
+function SettingsPanel({ tab, settingsH, authH, menu, cats, deviceH, historyH, applyStockView }) {
   const panelProps = { settingsH, menu, cats };
   switch (tab) {
     case "printer": return <PrinterSettingsTab {...panelProps} />;
@@ -47,11 +49,12 @@ function SettingsPanel({ tab, settingsH, authH, menu, cats, deviceH }) {
     case "advanced": return <AdvancedSettingsTab {...panelProps} authH={authH} />;
     case "cloud": return <CloudSyncSettingsTab authH={authH} deviceH={deviceH} />;
     case "kds": return <KdsSettingsTab settingsH={settingsH} cats={cats} deviceH={deviceH} />;
+    case "trash": return <RecycleBinSettingsTab historyH={historyH} applyStockView={applyStockView} />;
     default: return null;
   }
 }
 
-export default function SettingsModal({ settingsH, authH, menu = [], cats = [] }) {
+export default function SettingsModal({ settingsH, authH, menu = [], cats = [], historyH = null, applyStockView = null }) {
   const [tab, setTab] = useState("printer");
   const isAndroid = typeof window !== "undefined" && !!window.kasirAndroid;
   // Hook harus dipanggil di level komponen (bukan di dalam switch), dan hidup
@@ -70,7 +73,7 @@ export default function SettingsModal({ settingsH, authH, menu = [], cats = [] }
           {SETTINGS_TABS.filter(([key]) => (!isAndroid || !["backup", "cloud"].includes(key))).map(([key, label]) => <SettingsTabButton key={key} tab={key} activeTab={tab} onSelect={setTab}>{label}</SettingsTabButton>)}
         </aside>
         <div className="settings-modal-content" style={{ flex: 1, overflowY: "auto", padding: 16, minWidth: 0 }}>
-          <SettingsPanel tab={tab} settingsH={settingsH} authH={authH} menu={menu} cats={cats} deviceH={deviceH} />
+          <SettingsPanel tab={tab} settingsH={settingsH} authH={authH} menu={menu} cats={cats} deviceH={deviceH} historyH={historyH} applyStockView={applyStockView} />
         </div>
       </div>
       <div style={{ ...row }}><button onClick={close} style={{ marginLeft: "auto", padding: "8px 16px", background: COLOR_PALETTE.primaryLight, color: G, border: "none", borderRadius: RADIUS.md, cursor: "pointer", fontFamily: "inherit", fontSize: TYPOGRAPHY.small.fontSize, fontWeight: 700 }}>Tutup</button></div>

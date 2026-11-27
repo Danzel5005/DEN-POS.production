@@ -2,7 +2,7 @@
 
 Aplikasi Point of Sale (POS) desktop untuk warung dan usaha makanan/minuman. Aplikasi berjalan sebagai aplikasi Windows berbasis Electron dengan antarmuka React, menyimpan data transaksi secara lokal, dan mendukung pencetakan struk thermal maupun PDF.
 
-Dokumen ini mengikuti struktur dan perilaku kode yang ada di repository. Versi aplikasi saat ini adalah `1.4.2` untuk Windows 10 ke atas.
+Dokumen ini mengikuti struktur dan perilaku kode yang ada di repository. Versi aplikasi saat ini adalah `1.4.4` untuk Windows 10 ke atas.
 
 Selain fungsi kasir inti, aplikasi menyediakan fitur lanjutan yang dikelompokkan menjadi tiga grup — laporan tambahan (termasuk Presensi), fitur pelanggan tambahan, serta bahan baku, supplier, dan harga — dan dapat dinyalakan dari Settings pada tab Fitur Lanjutan.
 
@@ -62,6 +62,7 @@ Pilihan tambahan tidak mengubah harga dan item dengan pilihan berbeda menjadi ba
 - Tampilan per shift dapat dipilih melalui pemilih shift dan dikelompokkan per shift. Shift aktif diberi penanda hijau serta ditampilkan di atas shift terbaru hingga terlama. Ketika terdapat lebih dari lima shift, daftar ditampilkan secara ringkas dengan opsi menampilkan semua shift.
 - Detail transaksi dan penghapusan transaksi individual.
 - Penghapusan seluruh transaksi dengan buffer undo selama 9 detik.
+- Tempat sampah transaksi di Settings → Tempat Sampah: transaksi yang dihapus (satu per satu atau seluruhnya) disimpan 30 hari, dapat dipulihkan bersama stoknya, atau dihapus permanen lebih awal. Bila nomor transaksinya sudah dipakai transaksi baru, nomor yang dipulihkan digeser otomatis (+100, lalu +1000, dan seterusnya) sampai tidak bentrok.
 - Laporan keuangan per shift atau seluruh shift: pendapatan, modal, laba/rugi, dan margin.
 - Total Pax dan rata-rata belanja per Pax hanya ditampilkan jika fitur Pax pada Settings → Resi aktif.
 - Pilihan rincian Total Pendapatan atau Total Pengeluaran diberi highlight saat dipilih.

@@ -22,6 +22,7 @@ export default function ModalStack({
   printReceipt,
   setReceipt,
   menuH,
+  historyH,
   confirmCloseShift,
   closeShiftWarning = [],
   openingCashModal,
@@ -82,7 +83,7 @@ export default function ModalStack({
 
       {/* ══ MODAL: SETTINGS (PRINTER & PAYMENT) ════════════════════════════ */}
       {settingsH.settingsModal && (
-        <SettingsModal settingsH={settingsH} authH={authH} menu={menuH.menu} cats={menuH.cats} />
+        <SettingsModal settingsH={settingsH} authH={authH} menu={menuH.menu} cats={menuH.cats} historyH={historyH} applyStockView={menuH.applyStockView} />
       )}
 
       {/* ══ MODAL: PRINTER (Legacy, kept for backward compatibility) ════════ */}

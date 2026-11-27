@@ -40,6 +40,12 @@ function createDatabaseService({ ipcMain, files, ensureDir, rJSON, atomicWrite, 
           note TEXT,
           created_at DATETIME DEFAULT CURRENT_TIMESTAMP
         );
+        CREATE TABLE IF NOT EXISTS trx_deleted (
+          id TEXT PRIMARY KEY,
+          data TEXT NOT NULL,
+          deleted_at TEXT NOT NULL,
+          stock_restored INTEGER NOT NULL DEFAULT 0
+        );
         CREATE TABLE IF NOT EXISTS remote_restock_events (
           event_id TEXT PRIMARY KEY,
           item_type TEXT NOT NULL,
@@ -55,11 +61,13 @@ function createDatabaseService({ ipcMain, files, ensureDir, rJSON, atomicWrite, 
         CREATE INDEX IF NOT EXISTS idx_products_menu_id ON products(menu_id);
         CREATE INDEX IF NOT EXISTS idx_products_kategori ON products(kategori);
         CREATE INDEX IF NOT EXISTS idx_stock_movements_product ON stock_movements(product_id, created_at);
+        CREATE INDEX IF NOT EXISTS idx_trx_deleted_at ON trx_deleted(deleted_at);
       `);
       console.log("[Main] Tables created");
       // Migrasi ringan untuk DB lama (file sudah ada sebelum kolom ditambahkan).
       // CREATE TABLE IF NOT EXISTS tidak mengubah tabel yang sudah ada.
       ensureColumn("transactions", "synced_at", "DATETIME");
+      purgeTrash();
       // Buat indeks setelah migrasi kolom agar DB lama (yang belum memiliki
       // synced_at) tetap bisa dibuka. Sebelumnya CREATE INDEX di blok awal
       // membuat initDB gagal sebelum ensureColumn sempat berjalan.
@@ -70,6 +78,64 @@ function createDatabaseService({ ipcMain, files, ensureDir, rJSON, atomicWrite, 
       console.error("[DB] Failed to initialize SQLite:", err.message, err.stack);
       return false;
     }
+  }
+
+  // ── Tempat sampah transaksi (Pengaturan → Tempat Sampah).
+  // Transaksi yang dihapus disimpan TRASH_RETENTION_DAYS hari, lalu dibuang
+  // otomatis. `stock_restored` mengingat apakah stok sudah dikembalikan saat
+  // dihapus, supaya restore membaliknya persis (stok tidak dobel).
+  const TRASH_RETENTION_DAYS = 30;
+  const trashFile = () => files.trxTrash || path.join(files.dataDir, "transactions-trash.json");
+  const trashExpiry = (deletedAt) => new Date(new Date(deletedAt).getTime() + TRASH_RETENTION_DAYS * 86400000).toISOString();
+
+  function purgeTrash() {
+    const cutoff = new Date(Date.now() - TRASH_RETENTION_DAYS * 86400000).toISOString();
+    if (!db) {
+      const rows = rJSON(trashFile()) || [];
+      const kept = rows.filter((row) => String(row.deletedAt) >= cutoff);
+      if (kept.length !== rows.length) atomicWrite(trashFile(), kept);
+      return;
+    }
+    try { db.prepare("DELETE FROM trx_deleted WHERE deleted_at < ?").run(cutoff); }
+    catch (err) { console.error("[trash] purge failed:", err.message); }
+  }
+
+  // Catat ke tempat sampah. Dipanggil di dalam transaksi DB yang sama dengan
+  // DELETE, jadi baris tidak bisa hilang tanpa jejak.
+  function trashPut(trx, meta = {}) {
+    if (!trx || trx.id === undefined || trx.id === null) return;
+    const deletedAt = meta.deletedAt || new Date().toISOString();
+    const stockRestored = meta.stockRestored ? 1 : 0;
+    if (!db) {
+      const rows = rJSON(trashFile()) || [];
+      if (rows.some((row) => String(row.id) === String(trx.id))) return;
+      atomicWrite(trashFile(), [{ id: String(trx.id), data: trx, deletedAt, stockRestored: !!stockRestored }, ...rows]);
+      return;
+    }
+    db.prepare("INSERT OR REPLACE INTO trx_deleted (id, data, deleted_at, stock_restored) VALUES (?, ?, ?, ?)")
+      .run(String(trx.id), JSON.stringify(trx), deletedAt, stockRestored);
+  }
+
+  // Hapus satu id dari tempat sampah (dipakai saat transaksi kembali ke riwayat).
+  function trashDrop(id) {
+    if (!db) {
+      const rows = rJSON(trashFile()) || [];
+      const kept = rows.filter((row) => String(row.id) !== String(id));
+      if (kept.length !== rows.length) atomicWrite(trashFile(), kept);
+      return;
+    }
+    db.prepare("DELETE FROM trx_deleted WHERE id = ?").run(String(id));
+  }
+
+  function trashRows() {
+    purgeTrash();
+    if (!db) return (rJSON(trashFile()) || []).map((row) => ({ ...row, data: row.data }));
+    const rows = db.prepare("SELECT id, data, deleted_at, stock_restored FROM trx_deleted ORDER BY deleted_at DESC").all();
+    return rows.map((row) => {
+      let data = null;
+      try { data = JSON.parse(row.data); } catch { data = { id: row.id }; }
+      return { id: row.id, data, deletedAt: row.deleted_at, stockRestored: !!row.stock_restored };
+    });
   }
 
   // ensureColumn — tambah kolom hanya jika belum ada (idempoten, aman dijalankan
@@ -542,8 +608,8 @@ function createDatabaseService({ ipcMain, files, ensureDir, rJSON, atomicWrite, 
     });
 
     ipcMain.handle("trx-save", (_e, trx) => {
-      if (!db) { const list = rJSON(files.trx) || []; list.unshift(trx); atomicWrite(files.trx, list); return { ok: true }; }
-      try { db.prepare("INSERT INTO transactions (id, data) VALUES (?, ?)").run(trx.id || null, JSON.stringify(trx)); return { ok: true }; }
+      if (!db) { const list = rJSON(files.trx) || []; list.unshift(trx); atomicWrite(files.trx, list); trashDrop(trx.id); return { ok: true }; }
+      try { db.prepare("INSERT INTO transactions (id, data) VALUES (?, ?)").run(trx.id || null, JSON.stringify(trx)); trashDrop(trx.id); return { ok: true }; }
       catch (err) { console.error("[trx-save] Error:", err.message); return { ok: false, error: err.message }; }
     });
 
@@ -598,6 +664,7 @@ function createDatabaseService({ ipcMain, files, ensureDir, rJSON, atomicWrite, 
           if (menu && menu.length) atomicWrite(files.menu, menu);
           applied = stockDeltasFromTrx(trx, 1);
         }
+        trashPut(trx, { stockRestored: restoreStock && !!trx && !isTrxVoided(trx) });
         return { ok: true, trx, applied };
       }
       try {
@@ -609,6 +676,7 @@ function createDatabaseService({ ipcMain, files, ensureDir, rJSON, atomicWrite, 
           if (restoreStock && trx && !isTrxVoided(trx)) {
             applied = applyStockDelta(stockDeltasFromTrx(trx, 1), { type: "trx-delete", ref: id });
           }
+          trashPut(trx, { stockRestored: restoreStock && !!trx && !isTrxVoided(trx) });
         });
         run();
         return { ok: true, trx, applied };
@@ -679,8 +747,13 @@ function createDatabaseService({ ipcMain, files, ensureDir, rJSON, atomicWrite, 
 });
 
 ipcMain.handle("trx-restore", (_e, list) => {
-      if (!db) { atomicWrite(files.trx, list); return { ok: true }; }
-      try { db.exec("DELETE FROM transactions"); const stmt = db.prepare("INSERT INTO transactions (id, data) VALUES (?, ?)"); db.transaction((items) => items.forEach((item) => stmt.run(item.id || null, JSON.stringify(item))))(list); return { ok: true }; }
+      if (!db) { atomicWrite(files.trx, list); (list || []).forEach((item) => trashDrop(item?.id)); return { ok: true }; }
+      try {
+        db.exec("DELETE FROM transactions");
+        const stmt = db.prepare("INSERT INTO transactions (id, data) VALUES (?, ?)");
+        db.transaction((items) => items.forEach((item) => { stmt.run(item.id || null, JSON.stringify(item)); trashDrop(item.id); }))(list);
+        return { ok: true };
+      }
       catch (err) { console.error("[trx-restore] Error:", err.message); return { ok: false, error: err.message }; }
     });
     ipcMain.handle("trx-clear", (_e, { restoreStock = false } = {}) => {
@@ -730,6 +803,7 @@ ipcMain.handle("trx-restore", (_e, list) => {
           if (menu.length) atomicWrite(files.menu, [...byId.values()]);
         }
         atomicWrite(files.trx, []);
+        for (const t of all) trashPut(t, { stockRestored: restoreStock && !isTrxVoided(t) });
         return { ok: true, backupFile, applied, cleared: all };
       }
       try {
@@ -737,6 +811,7 @@ ipcMain.handle("trx-restore", (_e, list) => {
         const run = db.transaction(() => {
           if (restoreStock) applied = applyStockDelta(aggregateDeltas(), { type: "trx-clear" });
           db.exec("DELETE FROM transactions");
+          for (const t of all) trashPut(t, { stockRestored: restoreStock && !isTrxVoided(t) });
         });
         run();
         // `cleared` dipakai renderer untuk memulihkan stok bahan baku (bahan
@@ -783,17 +858,89 @@ ipcMain.handle("trx-restore", (_e, list) => {
           const seen = new Set(all.map((t) => String(t.id)));
           const merged = [...all, ...list.filter((t) => t && !seen.has(String(t.id)))];
           atomicWrite(files.trx, merged);
+          list.forEach((t) => { if (t) trashDrop(t.id); });
           return { ok: true, restored: merged.length - all.length };
         }
         const stmt = db.prepare("INSERT OR IGNORE INTO transactions (id, data) VALUES (?, ?)");
         const info = db.transaction((items) => {
           let n = 0;
-          items.forEach((item) => { if (item) n += stmt.run(item.id || null, JSON.stringify(item)).changes; });
+          items.forEach((item) => { if (item) { const c = stmt.run(item.id || null, JSON.stringify(item)).changes; n += c; if (c) trashDrop(item.id); } });
           return n;
         })(list);
         return { ok: true, restored: info };
       } catch (err) {
         console.error("[trx-restore-cleared] Error:", err.message);
+        return { ok: false, error: err.message };
+      }
+    });
+    // ── Tempat sampah (Pengaturan → Tempat Sampah) ──────────────────────────
+    // `trash-load` mengembalikan transaksi yang dihapus beserta sisa harinya.
+    ipcMain.handle("trash-load", () => {
+      try {
+        return {
+          ok: true,
+          items: trashRows()
+            .map((row) => ({ id: row.id, trx: row.data, deletedAt: row.deletedAt, expiresAt: trashExpiry(row.deletedAt), stockRestored: row.stockRestored }))
+            .sort((a, b) => String(b.deletedAt).localeCompare(String(a.deletedAt))),
+        };
+      } catch (err) {
+        console.error("[trash-load] Error:", err.message);
+        return { ok: false, error: err.message, items: [] };
+      }
+    });
+    // `trash-restore` mengembalikan transaksi ke riwayat dan menahan stok lagi
+    // bila stok sempat dikembalikan saat dihapus (supaya stok tidak dobel).
+    ipcMain.handle("trash-restore", (_e, id) => {
+      try {
+        if (!db) {
+          const rows = rJSON(trashFile()) || [];
+          const row = rows.find((item) => String(item.id) === String(id));
+          if (!row) return { ok: false, error: "Transaksi tidak ada di tempat sampah" };
+          const all = rJSON(files.trx) || [];
+          let applied = {};
+          const saved = freeTrxId(row.data, (candidate) => all.some((item) => String(item?.id) === candidate));
+          all.unshift(saved);
+          atomicWrite(files.trx, all);
+          if (row.stockRestored) {
+            const { menu } = restoreStockFromTrx(saved);
+            if (menu && menu.length) atomicWrite(files.menu, menu);
+            applied = stockDeltasFromTrx(saved, -1);
+          }
+          atomicWrite(trashFile(), rows.filter((item) => String(item.id) !== String(row.id)));
+          return { ok: true, trx: saved, applied, restored: true, stockRestored: !!row.stockRestored };
+        }
+        const trash = db.prepare("SELECT id, data, deleted_at, stock_restored FROM trx_deleted WHERE id = ?").get(String(id));
+        if (!trash) return { ok: false, error: "Transaksi tidak ada di tempat sampah" };
+        let applied = {};
+        let saved = null;
+        const run = db.transaction(() => {
+          saved = freeTrxId(JSON.parse(trash.data), (candidate) => !!db.prepare("SELECT id FROM transactions WHERE id = ?").get(candidate));
+          const insert = db.prepare("INSERT OR IGNORE INTO transactions (id, data) VALUES (?, ?)").run(saved.id || null, JSON.stringify(saved));
+          if (!insert.changes) throw new Error("Gagal memulihkan transaksi: id masih bentrok");
+          trashDrop(id);
+          if (trash.stock_restored) {
+            applied = applyStockDelta(stockDeltasFromTrx(saved, -1), { type: "trx-restore", ref: saved.id });
+          }
+        });
+        run();
+        return { ok: true, trx: saved, applied, restored: true, stockRestored: !!trash.stock_restored };
+      } catch (err) {
+        console.error("[trash-restore] Error:", err.message);
+        return { ok: false, error: err.message };
+      }
+    });
+    // `trash-delete` menghapus permanen satu baris (tidak bisa di-undo).
+    ipcMain.handle("trash-delete", (_e, id) => {
+      try {
+        if (!db) {
+          const rows = rJSON(trashFile()) || [];
+          atomicWrite(trashFile(), rows.filter((item) => String(item.id) !== String(id)));
+          return { ok: true };
+        }
+        db.prepare("DELETE FROM trx_deleted WHERE id = ?").run(String(id));
+        return { ok: true };
+      } catch (err) {
+        console.error("[trash-delete] Error:", err.message);
         return { ok: false, error: err.message };
       }
     });
@@ -825,6 +972,23 @@ ipcMain.handle("trx-restore", (_e, list) => {
       const allocated = { ...trx, id };
       if (trx.kdsSourceRef === trx.id) allocated.kdsSourceRef = id;
       return allocated;
+    }
+
+    // Nomor transaksi yang dihapus bisa dipakai ulang oleh transaksi baru
+    // (alokasi hanya melihat tabel transactions). Saat dipulihkan, geser nomor
+    // urut +100, lalu +1000, +10000, ... sampai tidak bentrok.
+    // shortcut: lompatan +100 ini bukan skema permanen, ganti ke counter
+    // monoton kalau ID harian sudah melewati transaksi ke-100.
+    function freeTrxId(trx, isTaken) {
+      const match = /^TRX-(\d{6})(\d+)$/.exec(String(trx?.id || ""));
+      if (!match) return trx;
+      const prefix = `TRX-${match[1]}`;
+      const sequence = Number(match[2]);
+      let candidate = String(trx.id);
+      for (let bump = 100; isTaken(candidate); bump *= 10) candidate = `${prefix}${sequence + bump}`;
+      const renumbered = { ...trx, id: candidate };
+      if (trx.kdsSourceRef === trx.id) renumbered.kdsSourceRef = candidate;
+      return renumbered;
     }
 
     ipcMain.handle("process-payment", (_e, { trx, updatedMenu, activeBillId }) => {

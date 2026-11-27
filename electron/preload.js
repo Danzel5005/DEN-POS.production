@@ -9,6 +9,10 @@ const kasirAPI = {
   clearTrx:    (opts)  => ipcRenderer.invoke("trx-clear", opts),
   restoreClearedTrx: (backupFile) => ipcRenderer.invoke("trx-restore-cleared", backupFile),
   restorePreview: (q) => ipcRenderer.invoke("trx-restore-preview", q),
+  // Tempat sampah (Pengaturan → Tempat Sampah): transaksi dihapus disimpan 30 hari.
+  loadTrash:   ()      => ipcRenderer.invoke("trash-load"),
+  restoreTrash:(id)    => ipcRenderer.invoke("trash-restore", id),
+  deleteTrash: (id)    => ipcRenderer.invoke("trash-delete", id),
   voidTrx:     (id, data) => ipcRenderer.invoke("trx-void", id, data),
 settleTrx: (id, actor) => ipcRenderer.invoke("trx-settle", id, actor),
   // New: Filtered & paginated transactions
